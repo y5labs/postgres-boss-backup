@@ -65,10 +65,6 @@ inject('pod', async ({ boss }) => {
   const pgdb = new Pool(db_options())
   pgdb.on('error', error)
 
-  inject('command.now', async ({ boss }) => {
-    await boss.send(name)
-  })
-
   await boss.work(name, async () => {
     try {
       log('Discovering databases')
@@ -124,7 +120,7 @@ inject('pod', async ({ boss }) => {
     tz: process.env.TZ || 'UTC'
   })
 
-  setTimeout(() => {
-    boss.send(name)
-  }, 1000)
+  inject('command.now', async ({ boss }) => {
+    await boss.send(name)
+  })
 })
