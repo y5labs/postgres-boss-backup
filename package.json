@@ -1,0 +1,33 @@
+{
+  "name": "postgres-boss-backup",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development nodemon --es-module-specifier-resolution=node --experimental-json-modules --trace-deprecation -e js --require dotenv/config ./",
+    "start": "cross-env NODE_ENV=production node --es-module-specifier-resolution=node --experimental-json-modules --trace-deprecation ./",
+    "scratch": "cross-env NODE_ENV=development nodemon --es-module-specifier-resolution=node --experimental-json-modules --trace-deprecation -e js --require dotenv/config ./scratch.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/y5labs/postgres-boss-backup.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/y5labs/postgres-boss-backup/issues"
+  },
+  "homepage": "https://github.com/y5labs/postgres-boss-backup#readme",
+  "dependencies": {
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.0.0",
+    "neo-blessed": "^0.2.0",
+    "node-fetch": "^3.2.0",
+    "p-limit": "^4.0.0",
+    "pg": "^8.7.3",
+    "pg-boss": "^7.1.0",
+    "seacreature": "^2.17.0",
+    "telnet2": "^0.0.1"
+  }
+}
