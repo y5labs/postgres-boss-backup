@@ -2,14 +2,16 @@ import inject from 'seacreature/lib/inject'
 import pLimit from 'p-limit'
 import { exec } from 'child_process'
 import pg from 'pg'
-import fs from 'fs/promises'
+import fsp from 'fs/promises'
+import fs from 'fs'
+import Minio from 'minio'
 
 const assert_dir = async dir => {
   try {
-    await fs.access(dir)
+    await fsp.access(dir)
   } catch (err) {
     if (err.code === 'ENOENT') {
-      await fs.mkdir(dir, { recursive: true })
+      await fsp.mkdir(dir, { recursive: true })
     } else {
       throw err
     }
@@ -35,6 +37,7 @@ const launch = (name, command, options = {}) => new Promise((resolve, reject) =>
     error(...args)
     reject(args[1])
   }
+
   const p = exec(command, { shell: '/bin/sh', ...options })
   // p.on('spawn', () =>
   //   log(`${name} spawned`))
@@ -45,10 +48,23 @@ const launch = (name, command, options = {}) => new Promise((resolve, reject) =>
     complete_resolve(`${name} closed`, code)
   })
   p.on('exit', async code => {
+    const [ table_dir, ...rest ] = name.split('.')
+    const table_file = rest.join('.')
+    const file_stream = await fs.createReadStream(`./data/${table_dir}/${table_file}.sql`)
+    const min = await minio.putObject(`${process.env.MINIO_BUCKET}`, `${table_dir}/${table_file}.sql`, file_stream)
+    const file_del = await fs.unlinkSync(`./data/${table_dir}/${table_file}.sql`)
     complete_resolve(`${name} exited`, code)
   })
   // p.stdout.on('data', msg => log(msg))
   // p.stderr.on('data', msg => error(msg))
+})
+
+const minio = new Minio.Client({
+  endPoint: process.env.MINIO_URL,
+  port: 9000,
+  useSSL: false,
+  accessKey: process.env.MINIO_ACCESS_KEY,
+  secretKey: process.env.MINIO_SECRET_KEY
 })
 
 const db_options = name => ({
@@ -105,6 +121,13 @@ inject('pod', async ({ boss }) => {
       log('Backing up tables')
       const limit = pLimit(10)
       await Promise.all(tasks.map(t => limit(t)))
+
+      // const all_directories = await fsp.readdir('./data')
+      // const directories = all_directories.filter(p => p != 'README.md')
+      // for(const dir of directories) {
+      //   await fs.rmdirSync(`./data/${dir}`)
+      // }
+
       log('Backup complete')
     } catch(e) {
       error(`Error encountered during backup - ${e}`)
