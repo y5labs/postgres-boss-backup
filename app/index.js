@@ -52,7 +52,7 @@ const launch = (name, command, options = {}) => new Promise((resolve, reject) =>
     const table_file = rest.join('.')
     const file_stream = await fs.createReadStream(`./data/${table_dir}/${table_file}.sql`)
     const min = await minio.putObject(`${process.env.MINIO_BUCKET}`, `${table_dir}/${table_file}.sql`, file_stream)
-    const file_del = await fs.unlinkSync(`./data/${table_dir}/${table_file}.sql`)
+    // const file_del = await fs.unlinkSync(`./data/${table_dir}/${table_file}.sql`)
     complete_resolve(`${name} exited`, code)
   })
   // p.stdout.on('data', msg => log(msg))
