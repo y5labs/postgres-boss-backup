@@ -59,6 +59,8 @@ const db_options = name => ({
   port: process.env.DB_PORT
 })
 
+const database_blacklist = process.env.DATABASE_BLACKLIST ? process.env.DATABASE_BLACKLIST.split(',') : []
+
 inject('pod', async ({ boss }) => {
   const name = process.env.QUEUE || 'postgres-boss-backup'
   const db_host = `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}`
@@ -69,7 +71,7 @@ inject('pod', async ({ boss }) => {
     try {
       log('Discovering databases')
       const { rows: dats } = await pgdb.query('select datname from pg_database where datistemplate = false')
-      const databases = dats.map(d => d.datname)
+      const databases = dats.map(d => d.datname).filter(d => !database_blacklist.includes(d))
       const tasks = []
       const add_task = (d, t) => tasks.push(async () => {
         const cmd = `pg_dump --compress=0 --format=plain --file=${t}.sql --table=${t} ${db_host}/${d}`
