@@ -57,7 +57,7 @@ const launch = (name, command, options = {}) => new Promise((resolve, reject) =>
       console.log('table: ', table_file)
       console.log(min)
     }
-    // const file_del = await fs.unlinkSync(`./data/${table_dir}/${table_file}.sql`)
+    const file_del = await fs.unlinkSync(`./data/${table_dir}/${table_file}.sql`)
     complete_resolve(`${name} exited`, code)
   })
   // p.stdout.on('data', msg => log(msg))
