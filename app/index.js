@@ -224,7 +224,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   await boss.work(`${job_prefix}.${CONTAINER_NAME}`, async job => {
     const job_entry = await boss.getJobById(job.id)
-    const formatted_name = await format_string(CONTAINER_NAME.toLowerCase())
+    const formatted_name = await format_string(SERVER_NAME.toLowerCase())
 
     try {
       const start = Date.now()
@@ -267,7 +267,6 @@ inject('pod', async ({ boss, minio, discord }) => {
         size_output += `${formatted_key}: ${value}MB\n`
       }
 
-      const formatted_name = await format_string(CONTAINER_NAME.toLowerCase())
       await discord.notification(`✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}' completed successfully.`, [
         {
           title: `Backup completed successfully in ${timing.total}mins`,
