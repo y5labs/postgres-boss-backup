@@ -269,7 +269,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
       await discord.notification(`✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}' completed successfully.`, [
         {
-          title: `Backup completed successfully in ${timing.total}mins`,
+          title: `Backup completed successfully in ${timing.total} secs`,
           color: 65280,
           timestamp: new Date(),
           fields: [
