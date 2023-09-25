@@ -265,7 +265,7 @@ inject('pod', async ({ boss, minio, discord }) => {
         size_output += `${formatted_key}: ${value}MB\n`
       }
 
-      await discord.notification(`✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${SERVER_NAME.toLowerCase()}' completed successfully.`, [
+      await discord.notification(`✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${SERVER_NAME.toLowerCase()} - ${CONTAINER_NAME}' completed successfully.`, [
         {
           title: `Backup completed successfully in ${timing.total}mins`,
           color: 65280,
@@ -286,7 +286,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     } catch (e) {
       console.error(`unable to perform postgres backup for '${SERVER_NAME.toLowerCase()}'`)
       if (job_entry.retrycount < 3) {
-        await discord.notification(`:warning: Postgres Backup → Unable to perform a database backup for '${DISCORD_ICON} ${SERVER_NAME.toLowerCase()}', retrying...`, [
+        await discord.notification(`:warning: Postgres Backup → Unable to perform a database backup for '${DISCORD_ICON} ${SERVER_NAME.toLowerCase()} - ${CONTAINER_NAME}', retrying...`, [
           {
             title: 'An error has occured while trying to back up the database.',
             color: 16711680,
