@@ -4,7 +4,6 @@ import { exec } from 'child_process'
 import pg from 'pg'
 import fsp from 'fs/promises'
 import fs from 'fs'
-import Minio from 'minio'
 import { format } from 'date-fns'
 import zlib from 'zlib'
 
