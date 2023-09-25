@@ -249,22 +249,22 @@ inject('pod', async ({ boss, minio, discord }) => {
       const end = Date.now()
 
       const timing = {
-        backup: await to_mins_and_seconds(backup_end - backup_start),
-        compression: await to_mins_and_seconds(compression_end - compression_start),
-        minio: await to_mins_and_seconds(minio_end - minio_start),
-        total: await to_mins_and_seconds(end - start)
+        backup: ((backup_end - backup_start)/1000),
+        compression: ((compression_end - compression_start)/1000),
+        minio: ((minio_end - minio_start)/1000),
+        total: ((end - start)/1000)
       }
 
       let timing_output = ''
       for (const [key, value] of Object.entries(timing)) {
         const formatted_key = await format_string(key)
-        timing_output += `${formatted_key}: ${value}mins\n`
+        timing_output += `${formatted_key}: ${value} secs\n`
       }
 
       let size_output = ''
       for (const [key, value] of Object.entries(size)) {
         const formatted_key = await format_string(key)
-        size_output += `${formatted_key}: ${value}MB\n`
+        size_output += `${formatted_key}: ${value} MB\n`
       }
 
       await discord.notification(`✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}' completed successfully.`, [
