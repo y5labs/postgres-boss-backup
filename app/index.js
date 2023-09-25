@@ -128,8 +128,8 @@ inject('pod', async ({ boss, minio, discord }) => {
       log('queueing backup')
       const tasks = []
       const add_task = (c) => tasks.push(async () => {
-        const verbose = DUMP_LOGGING ? '-v' : ''
-        const structure_only = DATABASE_STRUCTURE_ONLY ? '-s' : ''
+        const verbose = Number(DUMP_LOGGING) ? '-v' : ''
+        const structure_only = Number(DATABASE_STRUCTURE_ONLY) ? '-s' : ''
         const blacklist = DATABASE_BLACKLIST ? DATABASE_BLACKLIST.split(',') : []
         const exclusions = blacklist.length ? blacklist.map(db => `--exclude-database=${db}`).join(' ') : ''
 
