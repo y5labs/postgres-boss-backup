@@ -249,10 +249,10 @@ inject('pod', async ({ boss, minio, discord }) => {
       const end = Date.now()
 
       const timing = {
-        backup: ((backup_end - backup_start)/1000),
-        compression: ((compression_end - compression_start)/1000),
-        minio: ((minio_end - minio_start)/1000),
-        total: ((end - start)/1000)
+        backup: ((backup_end - backup_start)/1000).toFixed(0),
+        compression: ((compression_end - compression_start)/1000).toFixed(0),
+        minio: ((minio_end - minio_start)/1000).toFixed(0),
+        total: ((end - start)/1000).toFixed(0)
       }
 
       let timing_output = ''
