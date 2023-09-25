@@ -125,7 +125,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   const postgres_backup = async (name) => {
     try {
-      log('queueing backup')
+      console.log('queueing backup')
       const tasks = []
       const add_task = (c) => tasks.push(async () => {
         const verbose = Number(DUMP_LOGGING) ? '-v' : ''
@@ -153,13 +153,13 @@ inject('pod', async ({ boss, minio, discord }) => {
       const container = CONTAINER_NAME || 'postgres-container'
       add_task(container)
 
-      log('begin back up process')
+      console.log('begin back up process')
       const limit = pLimit(10)
       await Promise.all(tasks.map(t => limit(t)))
 
-      log('backup complete')
+      console.log('backup complete')
     } catch(e) {
-      error(`error encountered during backup - ${e}`)
+      console.error(`error encountered during backup - ${e}`)
       throw e
     }
   }
@@ -224,6 +224,8 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   await boss.work(`${job_prefix}.${CONTAINER_NAME}`, async job => {
     const job_entry = await boss.getJobById(job.id)
+    const formatted_name = await format_string(CONTAINER_NAME.toLowerCase())
+
     try {
       const start = Date.now()
       const backup_start = Date.now()
@@ -265,7 +267,8 @@ inject('pod', async ({ boss, minio, discord }) => {
         size_output += `${formatted_key}: ${value}MB\n`
       }
 
-      await discord.notification(`✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${SERVER_NAME.toLowerCase()} - ${CONTAINER_NAME}' completed successfully.`, [
+      const formatted_name = await format_string(CONTAINER_NAME.toLowerCase())
+      await discord.notification(`✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}' completed successfully.`, [
         {
           title: `Backup completed successfully in ${timing.total}mins`,
           color: 65280,
@@ -286,7 +289,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     } catch (e) {
       console.error(`unable to perform postgres backup for '${SERVER_NAME.toLowerCase()}'`)
       if (job_entry.retrycount < 3) {
-        await discord.notification(`:warning: Postgres Backup → Unable to perform a database backup for '${DISCORD_ICON} ${SERVER_NAME.toLowerCase()} - ${CONTAINER_NAME}', retrying...`, [
+        await discord.notification(`:warning: Postgres Backup → Unable to perform a database backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}', retrying...`, [
           {
             title: 'An error has occured while trying to back up the database.',
             color: 16711680,
