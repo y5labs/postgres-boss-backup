@@ -125,7 +125,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   const postgres_backup = async (name) => {
     try {
-      console.log('queueing backup')
+      console.log(`queueing backup '${name}'`)
       const tasks = []
       const add_task = (c) => tasks.push(async () => {
         const verbose = Number(DUMP_LOGGING) ? '-v' : ''
@@ -135,6 +135,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
         const cmd = `pg_dumpall -h ${DB_HOST} -p ${DB_PORT} ${verbose} ${structure_only} -U ${DB_USER} --file=${c}.sql ${exclusions}`
         const dir = `${process.env.BK_DIR || `${process.cwd()}/data`}`
+        console.log('cmd',cmd)
         await assert_dir(dir)
         try {
           await launch(`${c}`, cmd, {
@@ -166,7 +167,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   const compress_backup = async (file_name) => {
     try {
-      console.log('compress back up')
+      console.log(`compressing back up: ${file_name}`)
 
       const read_file = `${file_name}.sql`
       const write_file = `${file_name}.sql.gz`
@@ -175,7 +176,7 @@ inject('pod', async ({ boss, minio, discord }) => {
       console.log('compressed backup')
 
     } catch (err) {
-      console.error(`something went wrong writing a backup to minio bucket '${SERVER_NAME.toLowerCase()}'`)
+      console.error(`something went wrong compressing the backup '${SERVER_NAME.toLowerCase()}'`)
       console.error(err.message)
       throw err
     }
@@ -185,11 +186,9 @@ inject('pod', async ({ boss, minio, discord }) => {
     try {
       console.log('write back ups to minio')
       const backup_path = `./data/${file_name}.sql`
-      const backup_file = fs.readFileSync(backup_path)
       const backup_name = `${file_name}.sql`
 
       const backup_path_compressed = `./data/${file_name}.sql.gz`
-      const backup_file_compressed = fs.readFileSync(backup_path_compressed)
       const backup_name_compressed = `${file_name}.sql.gz`
 
       const date_directory = format(new Date(), 'yyyy-MM-dd')
@@ -199,8 +198,11 @@ inject('pod', async ({ boss, minio, discord }) => {
         throw new Error(`unable to locate either '${backup_path}' or '${backup_path_compressed}'.`)
       }
 
-      await minio.putObject(SERVER_NAME.toLowerCase(), `${date_directory}/${backup_name}`, backup_file)
-      await minio.putObject(SERVER_NAME.toLowerCase(), `${date_directory}/${backup_name_compressed}`, backup_file_compressed)
+      console.log(`writing backup file to minio :${backup_path}`)
+      await minio.fPutObject(SERVER_NAME.toLowerCase(), `${date_directory}/${backup_name}`, backup_path)
+
+      console.log(`writing backup file to minio :${backup_path_compressed}`)
+      await minio.fPutObject(SERVER_NAME.toLowerCase(), `${date_directory}/${backup_name_compressed}`, backup_path_compressed)
       console.log('written back ups to minio')
 
       // keep files on the server until disk space is an issue
