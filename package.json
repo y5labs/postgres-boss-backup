@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon --es-module-specifier-resolution=node --experimental-json-modules --trace-deprecation -e js --require dotenv/config ./",
     "start": "cross-env NODE_ENV=production node --es-module-specifier-resolution=node --experimental-json-modules --trace-deprecation ./",
-    "scratch": "cross-env NODE_ENV=development nodemon --es-module-specifier-resolution=node --experimental-json-modules --trace-deprecation -e js --require dotenv/config ./scratch.js"
+    "scratch": "cross-env NODE_ENV=development nodemon --es-module-specifier-resolution=node --experimental-json-modules --trace-deprecation -e js --require dotenv/config ./scratch.js",
+    "hack": "cross-env NODE_ENV=development node --require dotenv/config ./scratch.js"
   },
   "repository": {
     "type": "git",
