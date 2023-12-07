@@ -215,7 +215,7 @@ inject('pod', async ({ boss, minio, discord }) => {
   }
 
   const SCHEDULE = BOSS_SCHEDULE || '0 0 * * *'
-  await boss.schedule(`${job_prefix}.${SERVER_NAME.CONTAINER_NAME}`, SCHEDULE, null, {
+  await boss.schedule(`${job_prefix}.${SERVER_NAME}.${CONTAINER_NAME}`, SCHEDULE, null, {
     singletonKey: `${BOSS_APPLICATION_NAME}.${SERVER_NAME.toLowerCase()}`,
     retryLimit: Number(BOSS_RETRY_LIMIT || 5),
     retryDelay: Number(BOSS_RETRY_DELAY || 300),
@@ -224,7 +224,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     tz: BOSS_TZ || 'UTC'
   })
 
-  await boss.work(`${job_prefix}.${CONTAINER_NAME}`, async job => {
+  await boss.work(`${job_prefix}.${SERVER_NAME}.${CONTAINER_NAME}`, async job => {
     const job_entry = await boss.getJobById(job.id)
     const formatted_name = await format_string(SERVER_NAME.toLowerCase())
 
@@ -305,6 +305,6 @@ inject('pod', async ({ boss, minio, discord }) => {
   })
 
   inject('command.now', async ({ boss }) => {
-    await boss.send(`${job_prefix}.${CONTAINER_NAME}`)
+    await boss.send(`${job_prefix}.${SERVER_NAME}.${CONTAINER_NAME}`)
   })
 })
