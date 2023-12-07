@@ -115,8 +115,8 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   // check for minio bucket existence
   const minio_bucket_check = async () => {
+    const bucket_name = S3_BUCKET.toLowerCase()
     try {
-      const bucket_name = S3_BUCKET.toLowerCase()
       const buckets = await minio.listBuckets()
       const exists = buckets.find(b => b.name === bucket_name)
       if (!exists) {
@@ -221,7 +221,7 @@ inject('pod', async ({ boss, minio, discord }) => {
       // fs.unlinkSync(backup_path)
       // console.log(`postgres backup '${backup_path}' deleted`)
     } catch (err) {
-      console.log(`something went wrong writing a backup to minio bucket '${S3_BUCKET.toLowerCase()}'`)
+      console.log(`something went wrong writing a backup to minio bucket '${SERVER_NAME.toLowerCase()}'`)
       console.log(err.message)
     }
   }
