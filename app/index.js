@@ -96,6 +96,7 @@ const create_pgpass = function () {
   console.log(`Creating pgpass file - ${content}`)
   try {
     const res = fs.writeFileSync(pgpass_filepath, content)
+    fs.chmodSync(pgpass_filepath, fs.constants.S_IWUSR | fs.constants.S_IRUSR)
     console.log(res)
   } catch (err) {
     console.log(err)
