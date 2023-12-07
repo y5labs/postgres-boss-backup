@@ -97,9 +97,9 @@ const create_pgpass = function () {
     )
     return
   }
-  const [hostname, port] = ['*', '*', '*']
+  const [hostname, port, database] = ['*', '*', '*']
   const { DB_USER, DB_PASSWORD } = process.env
-  const content = `${hostname}:${port}:${DB_DATABASE}:${DB_USER}:${DB_PASSWORD}`
+  const content = `${hostname}:${port}:${database}:${DB_USER}:${DB_PASSWORD}`
   console.log(`Creating pgpass file - ${content}`)
   try {
     const res = fs.writeFileSync(pgpass_filepath, content)
