@@ -77,6 +77,11 @@ const list_bucket_objects = function (bucket_name) {
 }
 
 const try_create_bucket = async function (bucket_name) {
+  const buckets = await s3.listBuckets()
+  if (buckets.find(b => b.name === bucket_name)) {
+    console.log(`bucket '${bucket_name}' already exists.. goodbye`)
+    return
+  }
   await s3.makeBucket(bucket_name.toLowerCase(), S3_REGION)
   console.log(`minio bucket '${bucket_name.toLowerCase()}' created`)
 }
@@ -90,5 +95,6 @@ const try_minio_bb = async function () {
 }
 
 // await try_minio_bb()
-list_bucket_objects(S3_BUCKET)
-// try_create_bucket('database-backups')
+
+//list_bucket_objects(S3_BUCKET)
+try_create_bucket('whites-database-backups')

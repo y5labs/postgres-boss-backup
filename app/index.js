@@ -118,9 +118,10 @@ inject('pod', async ({ boss, minio, discord }) => {
     const bucket_name = S3_BUCKET.toLowerCase()
     try {
       const buckets = await minio.listBuckets()
+      console.log(buckets)
       const exists = buckets.find(b => b.name === bucket_name)
       if (!exists) {
-        await minio.makeBucket(bucket_name, S3_REGION || 'us-east-1')
+        await minio.makeBucket(bucket_name, S3_REGION)
         console.log(`minio bucket '${bucket_name}' created`)
       } else {
         console.log(`minio bucket '${bucket_name}' already exists`)
