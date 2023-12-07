@@ -24,60 +24,62 @@ const { Pool, Client } = pg
 const log = (...args) => console.log(new Date().toISOString(), ...args)
 const error = (...args) => console.error(new Date().toISOString(), ...args)
 
-const launch = (name, command, options = {}) => new Promise((resolve, reject) => {
-  let is_complete = false
-  const complete_resolve = (...args) => {
-    if (is_complete) return
-    is_complete = true
-    // log(...args)
-    resolve()
-  }
-  const complete_reject = (...args) => {
-    if (is_complete) return
-    is_complete = true
-    error(...args)
-    reject(args[1])
-  }
+const launch = (name, command, options = {}) =>
+  new Promise((resolve, reject) => {
+    let is_complete = false
+    const complete_resolve = (...args) => {
+      if (is_complete) return
+      is_complete = true
+      // log(...args)
+      resolve()
+    }
+    const complete_reject = (...args) => {
+      if (is_complete) return
+      is_complete = true
+      error(...args)
+      reject(args[1])
+    }
 
-  const p = exec(command, { shell: '/bin/sh', ...options })
-  // p.on('spawn', () =>
-  //   log(`${name} spawned`))
-  p.on('error', async e => {
-    complete_reject(`${name} errored`, e)
-  })
-  p.on('close', async code => {
-    complete_resolve(`${name} closed`, code)
-  })
-  p.on('exit', async code => {
-    complete_resolve(`${name} exited`, code)
-  })
-  p.stdout.on('data', msg => log(msg))
-  p.stderr.on('data', msg => error(msg))
-})
-
-const compress = (input_file, output_file) => new Promise((resolve, reject) => {
-  const read_stream = fs.createReadStream(input_file)
-  const write_stream = fs.createWriteStream(output_file)
-  const gzip = zlib.createGzip()
-
-  read_stream.pipe(gzip).pipe(write_stream)
-
-  write_stream.on('close', () => {
-    resolve('file compressed successfully.')
+    const p = exec(command, { shell: '/bin/sh', ...options })
+    // p.on('spawn', () =>
+    //   log(`${name} spawned`))
+    p.on('error', async e => {
+      complete_reject(`${name} errored`, e)
+    })
+    p.on('close', async code => {
+      complete_resolve(`${name} closed`, code)
+    })
+    p.on('exit', async code => {
+      complete_resolve(`${name} exited`, code)
+    })
+    p.stdout.on('data', msg => log(msg))
+    p.stderr.on('data', msg => error(msg))
   })
 
-  write_stream.on('error', (error) => {
-    reject(error);
-  })
-})
+const compress = (input_file, output_file) =>
+  new Promise((resolve, reject) => {
+    const read_stream = fs.createReadStream(input_file)
+    const write_stream = fs.createWriteStream(output_file)
+    const gzip = zlib.createGzip()
 
-const to_mins_and_seconds = async (ms) => {
+    read_stream.pipe(gzip).pipe(write_stream)
+
+    write_stream.on('close', () => {
+      resolve('file compressed successfully.')
+    })
+
+    write_stream.on('error', error => {
+      reject(error)
+    })
+  })
+
+const to_mins_and_seconds = async ms => {
   const minutes = Math.floor(ms / 60000)
   const seconds = ((ms % 60000) / 1000).toFixed(0)
-  return minutes + ":" + (seconds < 10 ? '0' : '') + seconds
+  return minutes + ':' + (seconds < 10 ? '0' : '') + seconds
 }
 
-const format_string = async (text) => {
+const format_string = async text => {
   const formatted = text.split(' ').map(t => t.charAt(0).toUpperCase() + t.slice(1))
   return formatted.join('')
 }
@@ -100,7 +102,12 @@ inject('pod', async ({ boss, minio, discord }) => {
     DB_USER,
     DISCORD_ICON,
     DUMP_LOGGING,
-    SERVER_NAME
+    SERVER_NAME,
+    BACKBLAZE_ENDPOINT,
+    BACKBLAZE_KEY_ID,
+    BACKBLAZE_APPLICATION_KEY,
+    BACKBLAZE_BUCKET,
+    BACKBLAZE_PORT
   } = process.env
 
   const job_prefix = 'postgres-backup'
@@ -123,33 +130,33 @@ inject('pod', async ({ boss, minio, discord }) => {
   }
   await minio_bucket_check()
 
-  const postgres_backup = async (name) => {
+  const postgres_backup = async name => {
     try {
       console.log(`queueing backup '${name}'`)
       const tasks = []
-      const add_task = (c) => tasks.push(async () => {
-        const verbose = Number(DUMP_LOGGING) ? '-v' : ''
-        const structure_only = Number(DATABASE_STRUCTURE_ONLY) ? '-s' : ''
-        const blacklist = DATABASE_BLACKLIST ? DATABASE_BLACKLIST.split(',') : []
-        const exclusions = blacklist.length ? blacklist.map(db => `--exclude-database=${db}`).join(' ') : ''
+      const add_task = c =>
+        tasks.push(async () => {
+          const verbose = Number(DUMP_LOGGING) ? '-v' : ''
+          const structure_only = Number(DATABASE_STRUCTURE_ONLY) ? '-s' : ''
+          const blacklist = DATABASE_BLACKLIST ? DATABASE_BLACKLIST.split(',') : []
+          const exclusions = blacklist.length ? blacklist.map(db => `--exclude-database=${db}`).join(' ') : ''
 
-        const cmd = `pg_dumpall -h ${DB_HOST} -p ${DB_PORT} ${verbose} ${structure_only} -U ${DB_USER} --file=${c}.sql ${exclusions}`
-        const dir = `${process.env.BK_DIR || `${process.cwd()}/data`}`
-        console.log('cmd',cmd)
-        await assert_dir(dir)
-        try {
-          await launch(`${c}`, cmd, {
-            cwd: dir,
-            env: {
-              PATH: process.env.PATH
-            }
-          })
-        }
-        catch (e) {
-          error(cmd, e)
-          throw e
-        }
-      })
+          const cmd = `pg_dumpall -h ${DB_HOST} -p ${DB_PORT} ${verbose} ${structure_only} -U ${DB_USER} --file=${c}.sql ${exclusions}`
+          const dir = `${process.env.BK_DIR || `${process.cwd()}/data`}`
+          console.log('cmd', cmd)
+          await assert_dir(dir)
+          try {
+            await launch(`${c}`, cmd, {
+              cwd: dir,
+              env: {
+                PATH: process.env.PATH
+              }
+            })
+          } catch (e) {
+            error(cmd, e)
+            throw e
+          }
+        })
 
       const container = CONTAINER_NAME || 'postgres-container'
       add_task(container)
@@ -159,13 +166,13 @@ inject('pod', async ({ boss, minio, discord }) => {
       await Promise.all(tasks.map(t => limit(t)))
 
       console.log('backup complete')
-    } catch(e) {
+    } catch (e) {
       console.error(`error encountered during backup - ${e}`)
       throw e
     }
   }
 
-  const compress_backup = async (file_name) => {
+  const compress_backup = async file_name => {
     try {
       console.log(`compressing back up: ${file_name}`)
 
@@ -174,7 +181,6 @@ inject('pod', async ({ boss, minio, discord }) => {
 
       await compress(`./data/${read_file}`, `./data/${write_file}`)
       console.log('compressed backup')
-
     } catch (err) {
       console.error(`something went wrong compressing the backup '${SERVER_NAME.toLowerCase()}'`)
       console.error(err.message)
@@ -182,7 +188,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     }
   }
 
-  const minio_write = async (file_name) => {
+  const minio_write = async file_name => {
     try {
       console.log('write back ups to minio')
       const backup_path = `./data/${file_name}.sql`
@@ -193,7 +199,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
       const date_directory = format(new Date(), 'yyyy-MM-dd')
 
-      if(!await fs.existsSync(backup_path) || !await fs.existsSync(backup_path_compressed)) {
+      if (!(await fs.existsSync(backup_path)) || !(await fs.existsSync(backup_path_compressed))) {
         console.error(`unable to locate either '${backup_path}' or '${backup_path_compressed}'.`)
         throw new Error(`unable to locate either '${backup_path}' or '${backup_path_compressed}'.`)
       }
@@ -202,7 +208,11 @@ inject('pod', async ({ boss, minio, discord }) => {
       await minio.fPutObject(SERVER_NAME.toLowerCase(), `${date_directory}/${backup_name}`, backup_path)
 
       console.log(`writing backup file to minio :${backup_path_compressed}`)
-      await minio.fPutObject(SERVER_NAME.toLowerCase(), `${date_directory}/${backup_name_compressed}`, backup_path_compressed)
+      await minio.fPutObject(
+        SERVER_NAME.toLowerCase(),
+        `${date_directory}/${backup_name_compressed}`,
+        backup_path_compressed
+      )
       console.log('written back ups to minio')
 
       // keep files on the server until disk space is an issue
@@ -244,17 +254,17 @@ inject('pod', async ({ boss, minio, discord }) => {
       const backup_compressed = fs.statSync(`./data/${CONTAINER_NAME}.sql.gz`)
 
       const size = {
-        backup: (backup.size/1024/1024).toFixed(0),
-        compressed: (backup_compressed.size/1024/1024).toFixed(0)
+        backup: (backup.size / 1024 / 1024).toFixed(0),
+        compressed: (backup_compressed.size / 1024 / 1024).toFixed(0)
       }
 
       const end = Date.now()
 
       const timing = {
-        backup: ((backup_end - backup_start)/1000).toFixed(0),
-        compression: ((compression_end - compression_start)/1000).toFixed(0),
-        minio: ((minio_end - minio_start)/1000).toFixed(0),
-        total: ((end - start)/1000).toFixed(0)
+        backup: ((backup_end - backup_start) / 1000).toFixed(0),
+        compression: ((compression_end - compression_start) / 1000).toFixed(0),
+        minio: ((minio_end - minio_start) / 1000).toFixed(0),
+        total: ((end - start) / 1000).toFixed(0)
       }
 
       let timing_output = ''
@@ -269,35 +279,41 @@ inject('pod', async ({ boss, minio, discord }) => {
         size_output += `${formatted_key}: ${value} MB\n`
       }
 
-      await discord.notification(`✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}' completed successfully.`, [
-        {
-          title: `Backup completed successfully in ${timing.total} secs`,
-          color: 65280,
-          timestamp: new Date(),
-          fields: [
-            {
-              name: 'Timing',
-              value: timing_output
-            },
-            {
-              name: 'Size',
-              value: size_output
-            }
-          ]
-        }
-      ])
+      await discord.notification(
+        `✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}' completed successfully.`,
+        [
+          {
+            title: `Backup completed successfully in ${timing.total} secs`,
+            color: 65280,
+            timestamp: new Date(),
+            fields: [
+              {
+                name: 'Timing',
+                value: timing_output
+              },
+              {
+                name: 'Size',
+                value: size_output
+              }
+            ]
+          }
+        ]
+      )
       await job.done()
     } catch (e) {
       console.error(`unable to perform postgres backup for '${SERVER_NAME.toLowerCase()}'`)
       if (job_entry.retrycount < 3) {
-        await discord.notification(`:warning: Postgres Backup → Unable to perform a database backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}', retrying...`, [
-          {
-            title: 'An error has occured while trying to back up the database.',
-            color: 16711680,
-            timestamp: new Date(),
-            fields: [e]
-          }
-        ])
+        await discord.notification(
+          `:warning: Postgres Backup → Unable to perform a database backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}', retrying...`,
+          [
+            {
+              title: 'An error has occured while trying to back up the database.',
+              color: 16711680,
+              timestamp: new Date(),
+              fields: [e]
+            }
+          ]
+        )
       }
       console.error(e)
       await job.done(e)

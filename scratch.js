@@ -1,6 +1,6 @@
 import { config } from 'dotenv'
 config()
-import { Client } from 'minio'
+import minio from 'minio'
 import fs from 'fs'
 import path from 'path'
 import { constrainedMemory } from 'process'
@@ -13,25 +13,18 @@ import { constrainedMemory } from 'process'
 //   secretKey: process.env.MINIO_SECRET_KEY
 // })
 
-// const secrets = {
-//   keyID: '005b5d0fa0db0440000000004',
-//   applicationKey: 'K005h8/Je6EuQHlpg2q7U2fHJNjeCVA'
-// }
-const secrets = {
-  keyID: '005b5d0fa0db0440000000004',
-  applicationKey: 'K005h8/Je6EuQHlpg2q7U2fHJNjeCVA'
-}
+const { S3_URL, S3_ACCESS_KEY, S3_SECRET_KEY, S3_PORT, S3_BUCKET } = process.env
 
-const minio = new Client({
-  endPoint: 's3.us-east-005.backblazeb2.com',
-  port: 443,
+const s3 = new minio.Client({
+  endPoint: S3_URL,
+  port: parseInt(S3_PORT) || 443,
   useSSL: true,
-  accessKey: process.env.BACKBLAZE_KEY_ID,
-  secretKey: process.env.BACKBLAZE_APPLICATION_KEY
+  accessKey: S3_ACCESS_KEY,
+  secretKey: S3_SECRET_KEY
 })
-const backblaze_bucket_name = 'y5-whites-backup-test'
+const backblaze_bucket_name = S3_BUCKET
 
-console.log(minio)
+console.log(s3)
 
 async function upload(file_path) {
   const date_directory = new Date().toISOString().slice(0, 13)
@@ -39,7 +32,7 @@ async function upload(file_path) {
   console.log(file_path)
   console.log(backup_name)
   try {
-    const res = await minio.fPutObject(
+    const res = await s3.fPutObject(
       backblaze_bucket_name,
       process.env.SERVER_NAME.toLowerCase(),
       `${date_directory}/${backup_name}`,
@@ -65,7 +58,7 @@ console.log(big_file)
 // }
 
 const fPutBigObject = async function (minio_client) {
-  const res = await minio.fPutObject(
+  const res = await s3.fPutObject(
     'y5-whites-backup-test',
     'mcgrath/srv-captain--postgres-db-mcgrath.sql.gz',
     './data/srv-captain--postgres-db-mcgrath.sql.gz'
@@ -73,8 +66,8 @@ const fPutBigObject = async function (minio_client) {
   console.log(res)
 }
 
-const list_objects = function () {
-  const objectsStream = minio.listObjects(backblaze_bucket_name, '', true)
+const list_bucket_objects = function (bucket_name) {
+  const objectsStream = s3.listObjects(bucket_name, '', true)
   objectsStream.on('data', function (obj) {
     console.log(obj)
   })
@@ -85,11 +78,11 @@ const list_objects = function () {
 
 const try_minio_bb = async function () {
   console.log('trying to connect')
-  const buckets = await minio.listBuckets()
+  const buckets = await s3.listBuckets()
   console.log(buckets)
 
   //   console.log(await minio.listObjects('y5-whites-backup-test'))
 }
 
 // await try_minio_bb()
-list_objects()
+list_bucket_objects(S3_BUCKET)
