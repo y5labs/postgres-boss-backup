@@ -254,7 +254,7 @@ inject('pod', async ({ boss, minio, discord }) => {
       const date_directory = format(new Date(), 'yyyy-MM-dd')
 
       const missing = [uncompressed_backup_filepath, compressed_backup_filepath].filter(p => !fs.existsSync(p))
-      if (missing) {
+      if (missing.length) {
         console.error(`Unable to locate all backup files. Missing ${missing}.`)
         throw new Error(`Unable to locate all backup files. Missing ${missing}.`)
       }
