@@ -13,7 +13,7 @@ import { constrainedMemory } from 'process'
 //   secretKey: process.env.MINIO_SECRET_KEY
 // })
 
-const { S3_URL, S3_ACCESS_KEY, S3_SECRET_KEY, S3_PORT, S3_BUCKET } = process.env
+const { S3_URL, S3_ACCESS_KEY, S3_SECRET_KEY, S3_PORT, S3_BUCKET, S3_REGION } = process.env
 
 const s3 = new minio.Client({
   endPoint: S3_URL,
@@ -76,6 +76,11 @@ const list_bucket_objects = function (bucket_name) {
   })
 }
 
+const try_create_bucket = async function (bucket_name) {
+  await s3.makeBucket(bucket_name.toLowerCase(), S3_REGION)
+  console.log(`minio bucket '${bucket_name.toLowerCase()}' created`)
+}
+
 const try_minio_bb = async function () {
   console.log('trying to connect')
   const buckets = await s3.listBuckets()
@@ -86,3 +91,4 @@ const try_minio_bb = async function () {
 
 // await try_minio_bb()
 list_bucket_objects(S3_BUCKET)
+// try_create_bucket('database-backups')

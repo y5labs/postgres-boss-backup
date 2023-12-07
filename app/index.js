@@ -103,11 +103,12 @@ inject('pod', async ({ boss, minio, discord }) => {
     DISCORD_ICON,
     DUMP_LOGGING,
     SERVER_NAME,
-    BACKBLAZE_ENDPOINT,
-    BACKBLAZE_KEY_ID,
-    BACKBLAZE_APPLICATION_KEY,
-    BACKBLAZE_BUCKET,
-    BACKBLAZE_PORT
+    S3_ENDPOINT,
+    S3_KEY_ID,
+    S3_APPLICATION_KEY,
+    S3_BUCKET,
+    S3_PORT,
+    S3_REGION
   } = process.env
 
   const job_prefix = 'postgres-backup'
@@ -115,16 +116,17 @@ inject('pod', async ({ boss, minio, discord }) => {
   // check for minio bucket existence
   const minio_bucket_check = async () => {
     try {
+      const bucket_name = S3_BUCKET.toLowerCase()
       const buckets = await minio.listBuckets()
-      const exists = buckets.find(b => b.name === SERVER_NAME.toLowerCase())
+      const exists = buckets.find(b => b.name === bucket_name)
       if (!exists) {
-        await minio.makeBucket(SERVER_NAME.toLowerCase(), 'us-east-1')
-        console.log(`minio bucket '${SERVER_NAME.toLowerCase()}' created`)
+        await minio.makeBucket(bucket_name, S3_REGION || 'us-east-1')
+        console.log(`minio bucket '${bucket_name}' created`)
       } else {
-        console.log(`minio bucket '${SERVER_NAME.toLowerCase()}' already exists`)
+        console.log(`minio bucket '${bucket_name}' already exists`)
       }
     } catch (err) {
-      console.log(`something went wrong verifying/creating a minio bucket for '${SERVER_NAME.toLowerCase()}'`)
+      console.log(`something went wrong verifying/creating a minio bucket for '${bucket_name}'`)
       console.log(err.message)
     }
   }
@@ -205,11 +207,11 @@ inject('pod', async ({ boss, minio, discord }) => {
       }
 
       console.log(`writing backup file to minio :${backup_path}`)
-      await minio.fPutObject(SERVER_NAME.toLowerCase(), `${date_directory}/${backup_name}`, backup_path)
+      await minio.fPutObject(S3_BUCKET.toLowerCase(), `${date_directory}/${backup_name}`, backup_path)
 
       console.log(`writing backup file to minio :${backup_path_compressed}`)
       await minio.fPutObject(
-        SERVER_NAME.toLowerCase(),
+        S3_BUCKET.toLowerCase(),
         `${date_directory}/${backup_name_compressed}`,
         backup_path_compressed
       )
@@ -219,7 +221,7 @@ inject('pod', async ({ boss, minio, discord }) => {
       // fs.unlinkSync(backup_path)
       // console.log(`postgres backup '${backup_path}' deleted`)
     } catch (err) {
-      console.log(`something went wrong writing a backup to minio bucket '${SERVER_NAME.toLowerCase()}'`)
+      console.log(`something went wrong writing a backup to minio bucket '${S3_BUCKET.toLowerCase()}'`)
       console.log(err.message)
     }
   }
