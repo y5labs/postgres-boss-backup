@@ -179,6 +179,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     }
     return true
   }
+
   const s3_bucket_ok = await minio_bucket_check()
 
   create_pgpass()
@@ -260,7 +261,7 @@ inject('pod', async ({ boss, minio, discord }) => {
       }
 
       // note the object path prefix doesnt include the bucket name - thats later
-      const s3_object_path_prefix = process.env.S3_ENDPOINT.includes('backblaze')
+      const s3_object_path_prefix = process.env.S3_URL.includes('backblaze')
         ? `${SERVER_NAME.toLowerCase()}/${DB_DATABASE}`
         : `${date_directory}`
 
