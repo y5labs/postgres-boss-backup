@@ -248,6 +248,7 @@ inject('pod', async ({ boss, minio, discord }) => {
   const minio_write = async file_name => {
     try {
       console.log('write back ups to minio')
+
       const uncompressed_backup_filepath = `./data/${file_name}.sql`
       const uncompressed_backup_name = `${file_name}.sql`
 
@@ -262,13 +263,25 @@ inject('pod', async ({ boss, minio, discord }) => {
         throw new Error(`Unable to locate all backup files. Missing ${missing}.`)
       }
 
-      // note the object path prefix doesnt include the bucket name - thats later
-      const s3_object_path_prefix = process.env.S3_URL.includes('backblaze')
+      // --------------------------------------------------
+      // Bucket object naming - note the object path prefix
+      // doesnt include the bucket name - thats later
+      // --------------------------------------------------
+      const backblaze_target = S3_URL.includes('backblaze')
+      const s3_object_path_prefix = backblaze_target
         ? `${SERVER_NAME.toLowerCase()}/${DB_DATABASE}`
         : `${date_directory}`
 
-      const uncompressed_object_path = `${s3_object_path_prefix}/${uncompressed_backup_name}`
-      const compressed_object_path = `${s3_object_path_prefix}/${compressed_backup_name}`
+      const uncompressed_obj_name = backblaze_target
+        ? `${date_directory}-${uncompressed_backup_name}`
+        : `${uncompressed_backup_name}`
+
+      const compressed_obj_name = backblaze_target
+        ? `${date_directory}-${compressed_backup_name}`
+        : `${compressed_backup_name}`
+
+      const uncompressed_object_path = `${s3_object_path_prefix}/${uncompressed_obj_name}`
+      const compressed_object_path = `${s3_object_path_prefix}/${compressed_obj_name}`
       const write_uncompressed_to_s3 = SAVE_UNCOMPRESSED_BACKUP.toLowerCase() == 'true'
 
       if (write_uncompressed_to_s3) {
@@ -399,5 +412,9 @@ inject('pod', async ({ boss, minio, discord }) => {
   })
   inject('command.remove_pgpass', async () => {
     remove_pgpass()
+  })
+  inject('command.s3_upload', async () => {
+    await minio_bucket_check()
+    await minio_write()
   })
 })
