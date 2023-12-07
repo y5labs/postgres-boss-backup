@@ -102,7 +102,7 @@ const create_pgpass = function () {
   const content = `${hostname}:${port}:${database}:${DB_USER}:${DB_PASSWORD}`
   console.log(`Creating pgpass file - ${content}`)
   try {
-    const res = fs.writeFileSync(pgpass_filepath, content)
+    const res = fs.writeFileSync(pgpass_filepath, content + '\n')
     fs.chmodSync(pgpass_filepath, fs.constants.S_IWUSR | fs.constants.S_IRUSR)
     console.log(res)
   } catch (err) {
