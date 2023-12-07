@@ -98,11 +98,11 @@ const create_pgpass = function () {
     return
   }
   const [hostname, port, database] = ['*', '*', '*']
-  const { DB_USER, DB_PASSWORD } = process.env
-  const content = `${hostname}:${port}:${database}:${DB_USER}:${DB_PASSWORD}`
-  console.log(`Creating pgpass file - ${content}`)
+  const { DB_USER, DB_PASSWORD, DB_DATABASE } = process.env
+  const content = `${hostname}:${port}:${DB_DATABASE || database}:${DB_USER}:${DB_PASSWORD}`
+  console.log(`Creating .pgpass file - ${content}`)
   try {
-    const res = fs.writeFileSync(pgpass_filepath, content + '\n')
+    const res = fs.writeFileSync(pgpass_filepath, content + '\n') // not we require the newline in the .pgpass file it seems
     fs.chmodSync(pgpass_filepath, fs.constants.S_IWUSR | fs.constants.S_IRUSR)
     console.log(res)
   } catch (err) {
@@ -175,9 +175,12 @@ inject('pod', async ({ boss, minio, discord }) => {
     } catch (err) {
       console.log(`something went wrong verifying/creating a minio bucket for '${bucket_name}'`)
       console.log(err.message)
+      return false
     }
+    return true
   }
-  await minio_bucket_check()
+  const s3_bucket_ok = await minio_bucket_check()
+
   create_pgpass()
 
   const postgres_backup = async name => {
@@ -242,28 +245,38 @@ inject('pod', async ({ boss, minio, discord }) => {
   const minio_write = async file_name => {
     try {
       console.log('write back ups to minio')
-      const backup_path = `./data/${file_name}.sql`
-      const backup_name = `${file_name}.sql`
+      const uncompressed_backup_filepath = `./data/${file_name}.sql`
+      const uncompressed_backup_name = `${file_name}.sql`
 
-      const backup_path_compressed = `./data/${file_name}.sql.gz`
-      const backup_name_compressed = `${file_name}.sql.gz`
+      const compressed_backup_filepath = `./data/${file_name}.sql.gz`
+      const compressed_backup_name = `${file_name}.sql.gz`
 
       const date_directory = format(new Date(), 'yyyy-MM-dd')
 
-      if (!(await fs.existsSync(backup_path)) || !(await fs.existsSync(backup_path_compressed))) {
-        console.error(`unable to locate either '${backup_path}' or '${backup_path_compressed}'.`)
-        throw new Error(`unable to locate either '${backup_path}' or '${backup_path_compressed}'.`)
+      const missing = [uncompressed_backup_filepath, compressed_backup_filepath].filter(p => !fs.existsSync(p))
+      if (missing) {
+        console.error(`Unable to locate all backup files. Missing ${missing}.`)
+        throw new Error(`Unable to locate all backup files. Missing ${missing}.`)
       }
 
-      console.log(`writing backup file to minio :${backup_path}`)
-      await minio.fPutObject(S3_BUCKET.toLowerCase(), `${date_directory}/${backup_name}`, backup_path)
+      // note the object path prefix doesnt include the bucket name - thats later
+      const s3_object_path_prefix = process.env.S3_ENDPOINT.includes('backblaze')
+        ? `${SERVER_NAME.toLowerCase()}/${DB_DATABASE}`
+        : `${date_directory}`
 
-      console.log(`writing backup file to minio :${backup_path_compressed}`)
-      await minio.fPutObject(
-        S3_BUCKET.toLowerCase(),
-        `${date_directory}/${backup_name_compressed}`,
-        backup_path_compressed
-      )
+      const uncompressed_object_path = `${s3_object_path_prefix}/${uncompressed_backup_name}`
+      const compressed_object_path = `${s3_object_path_prefix}/${compressed_backup_name}`
+      const write_uncompressed_to_s3 = process.env.SAVE_UNCOMPRESSED_BACKUP.toLowerCase() == 'true'
+
+      if (write_uncompressed_to_s3) {
+        console.log(
+          `writing uncompressed backup file to minio: ${uncompressed_backup_filepath} -> ${uncompressed_object_path}`
+        )
+        await minio.fPutObject(S3_BUCKET.toLowerCase(), uncompressed_object_path, uncompressed_backup_filepath)
+      }
+
+      console.log(`writing compressed backup file to minio: ${compressed_backup_filepath} -> ${compressed_object_path}`)
+      await minio.fPutObject(S3_BUCKET.toLowerCase(), compressed_object_path, compressed_backup_filepath)
       console.log('written back ups to minio')
 
       // keep files on the server until disk space is an issue
