@@ -146,15 +146,17 @@ inject('pod', async ({ boss, minio, discord }) => {
     DB_HOST,
     DB_PORT,
     DB_USER,
+    DB_DATABASE,
     DISCORD_ICON,
     DUMP_LOGGING,
     SERVER_NAME,
-    S3_ENDPOINT,
+    S3_URL,
     S3_KEY_ID,
     S3_APPLICATION_KEY,
     S3_BUCKET,
     S3_PORT,
-    S3_REGION
+    S3_REGION,
+    SAVE_UNCOMPRESSED_BACKUP
   } = process.env
 
   const job_prefix = 'postgres-backup'
@@ -267,7 +269,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
       const uncompressed_object_path = `${s3_object_path_prefix}/${uncompressed_backup_name}`
       const compressed_object_path = `${s3_object_path_prefix}/${compressed_backup_name}`
-      const write_uncompressed_to_s3 = process.env.SAVE_UNCOMPRESSED_BACKUP.toLowerCase() == 'true'
+      const write_uncompressed_to_s3 = SAVE_UNCOMPRESSED_BACKUP.toLowerCase() == 'true'
 
       if (write_uncompressed_to_s3) {
         console.log(
@@ -284,7 +286,7 @@ inject('pod', async ({ boss, minio, discord }) => {
       // fs.unlinkSync(backup_path)
       // console.log(`postgres backup '${backup_path}' deleted`)
     } catch (err) {
-      console.log(`something went wrong writing a backup to minio bucket '${SERVER_NAME.toLowerCase()}'`)
+      console.log(`something went wrong writing a backup to minio bucket '${S3_BUCKET.toLowerCase()}'`)
       console.log(err.message)
     }
   }
