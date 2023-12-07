@@ -84,6 +84,35 @@ const format_string = async text => {
   return formatted.join('')
 }
 
+const pgpass_filepath = '/root/.pgpass'
+
+const create_pgpass = function () {
+  // hostname:port:database:username:password
+  // *:*:*:<DB_USER>:<DB_PASSWORD> we can use this format
+  // .pgpass users home dir /root in our case
+  const [hostname, port] = ['*', '*']
+  const { DB_USER, DB_PASSWORD, DB_DATABASE } = process.env
+  const content = `${hostname}:${port}:${DB_DATABASE}:${DB_USER}:${DB_PASSWORD}`
+  console.log(`Creating pgpass file - ${content}`)
+  try {
+    const res = fs.writeSync(pgpass_filepath, content)
+    console.log(res)
+  } catch (err) {
+    comnsole.log(err)
+  }
+}
+
+const check_pgpass = function () {
+  // hostname:port:database:username:password
+  // .pgpass users home dir /root in our case (container /root)
+  const exists = fs.existsSync(pgpass_filepath)
+  if (!exists) {
+    console.log(`No pgpass file at ${pgpass_filepath}`)
+    return
+  }
+  console.log(`pgpass file exists at ${pgpass_filepath} - ${fs.readFileSync(pgpass_filepath).toString()}`)
+}
+
 inject('pod', async ({ boss, minio, discord }) => {
   const {
     BACKUP_DIRECTORY,
@@ -132,6 +161,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     }
   }
   await minio_bucket_check()
+  create_pgpass()
 
   const postgres_backup = async name => {
     try {
@@ -147,6 +177,7 @@ inject('pod', async ({ boss, minio, discord }) => {
           const cmd = `pg_dumpall -h ${DB_HOST} -p ${DB_PORT} ${verbose} ${structure_only} -U ${DB_USER} --file=${c}.sql ${exclusions}`
           const dir = `${process.env.BK_DIR || `${process.cwd()}/data`}`
           console.log('cmd', cmd)
+          console.log('directory', dir)
           await assert_dir(dir)
           try {
             await launch(`${c}`, cmd, {
@@ -244,7 +275,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     try {
       const start = Date.now()
       const backup_start = Date.now()
-      await postgres_backup()
+      await postgres_backup(process.env.SERVER_NAME)
       const backup_end = Date.now()
       const compression_start = Date.now()
       await compress_backup(CONTAINER_NAME)
@@ -325,5 +356,12 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   inject('command.now', async ({ boss }) => {
     await boss.send(`${job_prefix}.${CONTAINER_NAME}`)
+  })
+
+  inject('command.create_pgpass', async () => {
+    create_pgpass()
+  })
+  inject('command.check_pgpass', async () => {
+    check_pgpass()
   })
 })
