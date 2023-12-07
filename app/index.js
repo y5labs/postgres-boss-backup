@@ -98,7 +98,7 @@ const create_pgpass = function () {
     const res = fs.writeSync(pgpass_filepath, content)
     console.log(res)
   } catch (err) {
-    comnsole.log(err)
+    console.log(err)
   }
 }
 
