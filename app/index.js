@@ -90,13 +90,29 @@ const create_pgpass = function () {
   // hostname:port:database:username:password
   // *:*:*:<DB_USER>:<DB_PASSWORD> we can use this format
   // .pgpass users home dir /root in our case
-  const [hostname, port] = ['*', '*']
-  const { DB_USER, DB_PASSWORD, DB_DATABASE } = process.env
+
+  if (fs.existsSync(pgpass_filepath)) {
+    console.log(
+      `.pgpass file exists at ${pgpass_filepath}. If you want to recreate use remove_pgpass the create_pgpass via telnet commands`
+    )
+    return
+  }
+  const [hostname, port] = ['*', '*', '*']
+  const { DB_USER, DB_PASSWORD } = process.env
   const content = `${hostname}:${port}:${DB_DATABASE}:${DB_USER}:${DB_PASSWORD}`
   console.log(`Creating pgpass file - ${content}`)
   try {
     const res = fs.writeFileSync(pgpass_filepath, content)
     fs.chmodSync(pgpass_filepath, fs.constants.S_IWUSR | fs.constants.S_IRUSR)
+    console.log(res)
+  } catch (err) {
+    console.log(err)
+  }
+}
+
+const remove_pgpass = function () {
+  try {
+    const res = fs.unlinkSync(pgpass_filepath)
     console.log(res)
   } catch (err) {
     console.log(err)
@@ -364,5 +380,8 @@ inject('pod', async ({ boss, minio, discord }) => {
   })
   inject('command.check_pgpass', async () => {
     check_pgpass()
+  })
+  inject('command.remove_pgpass', async () => {
+    remove_pgpass()
   })
 })
