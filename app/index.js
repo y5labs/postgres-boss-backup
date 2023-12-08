@@ -413,6 +413,9 @@ inject('pod', async ({ boss, minio, discord }) => {
   inject('command.remove_pgpass', async () => {
     remove_pgpass()
   })
+  inject('command.create_bucket', async () => {
+    await minio_bucket_check()
+  })
   inject('command.s3_upload', async () => {
     await minio_bucket_check()
     await minio_write()
