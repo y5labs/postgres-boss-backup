@@ -99,7 +99,7 @@ const create_pgpass = function () {
   }
   const [hostname, port, database] = ['*', '*', '*']
   const { DB_USER, DB_PASSWORD, DB_DATABASE } = process.env
-  const content = `${hostname}:${port}:${DB_DATABASE || database}:${DB_USER}:${DB_PASSWORD}`
+  const content = `${hostname}:${port}:${database}:${DB_USER}:${DB_PASSWORD}`
   console.log(`Creating .pgpass file - ${content}`)
   try {
     const res = fs.writeFileSync(pgpass_filepath, content + '\n') // not we require the newline in the .pgpass file it seems
