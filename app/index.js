@@ -151,10 +151,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     DUMP_LOGGING,
     SERVER_NAME,
     S3_URL,
-    S3_KEY_ID,
-    S3_APPLICATION_KEY,
     S3_BUCKET,
-    S3_PORT,
     S3_REGION,
     SAVE_UNCOMPRESSED_BACKUP
   } = process.env
@@ -268,31 +265,22 @@ inject('pod', async ({ boss, minio, discord }) => {
       // doesnt include the bucket name - thats later
       // --------------------------------------------------
       const backblaze_target = S3_URL.includes('backblaze')
-      const s3_object_path_prefix = backblaze_target
-        ? `${SERVER_NAME.toLowerCase()}/${DB_DATABASE}`
-        : `${date_directory}`
-
-      const uncompressed_obj_name = backblaze_target
-        ? `${date_directory}-${uncompressed_backup_name}`
-        : `${uncompressed_backup_name}`
-
-      const compressed_obj_name = backblaze_target
-        ? `${date_directory}-${compressed_backup_name}`
-        : `${compressed_backup_name}`
-
-      const uncompressed_object_path = `${s3_object_path_prefix}/${uncompressed_obj_name}`
-      const compressed_object_path = `${s3_object_path_prefix}/${compressed_obj_name}`
+      const s3_object_path_prefix = backblaze_target ? `database/${DB_DATABASE}/${date_directory}` : `${date_directory}`
+      const uncompressed_object_path = `${s3_object_path_prefix}/${uncompressed_backup_name}`
+      const compressed_object_path = `${s3_object_path_prefix}/${compressed_backup_name}`
       const write_uncompressed_to_s3 = SAVE_UNCOMPRESSED_BACKUP.toLowerCase() == 'true'
 
       if (write_uncompressed_to_s3) {
         console.log(
-          `writing uncompressed backup file to minio: ${uncompressed_backup_filepath} -> ${uncompressed_object_path}`
+          `writing uncompressed backup file to minio: ${uncompressed_backup_filepath} -> ${S3_BUCKET}/${uncompressed_object_path}`
         )
         await minio.fPutObject(S3_BUCKET.toLowerCase(), uncompressed_object_path, uncompressed_backup_filepath)
       }
 
-      console.log(`writing compressed backup file to minio: ${compressed_backup_filepath} -> ${compressed_object_path}`)
-      await minio.fPutObject(S3_BUCKET.toLowerCase(), compressed_object_path, compressed_backup_filepath)
+      console.log(
+        `writing compressed backup file to minio: ${compressed_backup_filepath} -> ${S3_BUCKET}/${compressed_object_path}`
+      )
+      await minio.fPutObject(S3_BUCKET, compressed_object_path, compressed_backup_filepath)
       console.log('written back ups to minio')
 
       // keep files on the server until disk space is an issue
