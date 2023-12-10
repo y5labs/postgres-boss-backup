@@ -93,7 +93,7 @@ const create_pgpass = function () {
 
   if (fs.existsSync(pgpass_filepath)) {
     console.log(
-      `.pgpass file exists at ${pgpass_filepath}. If you want to recreate use remove_pgpass the create_pgpass via telnet commands`
+      `.pgpass file exists at ${pgpass_filepath}. If you want to recreate use remove_pgpass then create_pgpass via telnet commands`
     )
     return
   }
