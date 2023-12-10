@@ -158,7 +158,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   const job_prefix = 'postgres-backup'
 
-  // check for minio bucket existence
+  // check for s3 bucket existence
   const minio_bucket_check = async () => {
     const bucket_name = S3_BUCKET.toLowerCase()
     try {
@@ -167,12 +167,12 @@ inject('pod', async ({ boss, minio, discord }) => {
       const exists = buckets.find(b => b.name === bucket_name)
       if (!exists) {
         await minio.makeBucket(bucket_name, S3_REGION)
-        console.log(`minio bucket '${bucket_name}' created`)
+        console.log(`s3 bucket '${bucket_name}' created`)
       } else {
-        console.log(`minio bucket '${bucket_name}' already exists`)
+        console.log(`s3 bucket '${bucket_name}' already exists`)
       }
     } catch (err) {
-      console.log(`something went wrong verifying/creating a minio bucket for '${bucket_name}'`)
+      console.log(`something went wrong verifying/creating a s3 bucket for '${bucket_name}'`)
       console.log(err.message)
       return false
     }
@@ -244,7 +244,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   const minio_write = async file_name => {
     try {
-      console.log('write back ups to minio')
+      console.log('write back ups to s3 bucket')
 
       const uncompressed_backup_filepath = `./data/${file_name}.sql`
       const uncompressed_backup_name = `${file_name}.sql`
@@ -272,22 +272,22 @@ inject('pod', async ({ boss, minio, discord }) => {
 
       if (write_uncompressed_to_s3) {
         console.log(
-          `writing uncompressed backup file to minio: ${uncompressed_backup_filepath} -> ${S3_BUCKET}/${uncompressed_object_path}`
+          `writing uncompressed backup file to s3 bucket: ${uncompressed_backup_filepath} -> ${S3_BUCKET}/${uncompressed_object_path}`
         )
         await minio.fPutObject(S3_BUCKET.toLowerCase(), uncompressed_object_path, uncompressed_backup_filepath)
       }
 
       console.log(
-        `writing compressed backup file to minio: ${compressed_backup_filepath} -> ${S3_BUCKET}/${compressed_object_path}`
+        `writing compressed backup file to s3 bucket: ${compressed_backup_filepath} -> ${S3_BUCKET}/${compressed_object_path}`
       )
       await minio.fPutObject(S3_BUCKET, compressed_object_path, compressed_backup_filepath)
-      console.log('written back ups to minio')
+      console.log('written back ups to s3 bucket')
 
       // keep files on the server until disk space is an issue
       // fs.unlinkSync(backup_path)
       // console.log(`postgres backup '${backup_path}' deleted`)
     } catch (err) {
-      console.log(`something went wrong writing a backup to minio bucket '${S3_BUCKET.toLowerCase()}'`)
+      console.log(`something went wrong writing a backup to s3 bucket '${S3_BUCKET.toLowerCase()}'`)
       console.log(err.message)
     }
   }
