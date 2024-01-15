@@ -238,8 +238,10 @@ inject('pod', async ({ boss, minio, discord }) => {
             const db_names = db_names_content.split('\n').slice(2, -1) // ignore first 2 lines of output (col name and sperator lines) and also last line ( row count)
             const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
 
-            console.log(`Inserting create statements at the head of the backup file: ${file} \n${create_dbs_text}`)
             const backup_file = `${dir}/${c}.sql`
+            console.log(
+              `Inserting create statements at the head of the backup file: ${backup_file} \n${create_dbs_text}`
+            )
             var data = fs.readFileSync(backup_file) //read existing contents into data
             var fd = fs.openSync(backup_file, 'w+')
             var buffer = Buffer.from(create_dbs_text)
