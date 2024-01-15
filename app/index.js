@@ -149,6 +149,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     DB_PORT,
     DB_USER,
     DB_DATABASE,
+    DB_PASSWORD,
     DISCORD_ICON,
     DUMP_LOGGING,
     SERVER_NAME,
