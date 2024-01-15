@@ -6,6 +6,8 @@ import fsp from 'fs/promises'
 import fs from 'fs'
 import { format } from 'date-fns'
 import zlib from 'zlib'
+// import { create } from 'domain'
+// import { fileURLToPath } from 'url'
 
 const assert_dir = async dir => {
   try {
@@ -200,12 +202,50 @@ inject('pod', async ({ boss, minio, discord }) => {
           console.log('directory', dir)
           await assert_dir(dir)
           try {
+            // Create the backup sql file
             await launch(`${c}`, cmd, {
               cwd: dir,
               env: {
                 PATH: process.env.PATH
               }
             })
+            // ---------------------------------------------------------------
+            // Fetch the database names from the server hosting the current db
+            // We will insert the create database statements at the head of the
+            // backup sql file
+            // ---------------------------------------------------------------
+            console.log('Fetching database names')
+            const db_container_name = c
+            const databases_output_file = `${dir}/${db_container_name}_databases.txt`
+            const databases_cmd_text = 'SELECT datname FROM pg_database WHERE datistemplate = false;'
+            const get_databases_cmd = `PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} --username ${DB_USER} -d ${DB_DATABASE} -o ${databases_output_file} -c "${databases_cmd_text}"`
+            await launch(`${c}`, get_databases_cmd, {
+              cwd: dir,
+              env: {
+                PATH: process.env.PATH
+              }
+            })
+
+            // ---------------------------------------------------------------
+            // Read back the db names from output file, build CREATE db statement
+            // lines, insert the statement lines at the head of the master
+            // backup/restore script
+            // ---------------------------------------------------------------
+
+            console.log('Building create database statements')
+            const x = fs.readFileSync(databases_output_file)
+            const db_names = x.split('\n').slice(2, -1) // ignore first 2 lines of output (col name and sperator lines) and also last line ( row count)
+            const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
+
+            console.log(`Inserting create statements at the head of the backup file: ${file}`)
+            const backup_file = `${dir}/${c}.sql`
+            var data = fs.readFileSync(backup_file) //read existing contents into data
+            var fd = fs.openSync(backup_file, 'w+')
+            var buffer = Buffer.from(create_dbs_text)
+
+            fs.writeSync(fd, buffer, 0, buffer.length, 0) //write new data
+            fs.writeSync(fd, data, 0, data.length, buffer.length) //append old data
+            fs.close(fd)
           } catch (e) {
             error(cmd, e)
             throw e
