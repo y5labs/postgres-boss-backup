@@ -242,7 +242,7 @@ inject('pod', async ({ boss, minio, discord }) => {
             const temp_filepath = `${dir}/${c}_tmp.sql`
 
             console.log(
-              `Inserting create statements at the head of the backup file: ${backup_file} \n${create_dbs_text}`
+              `Inserting create statements at the head of the temp backup file: ${temp_filepath} \n${create_dbs_text}`
             )
 
             const output_stream = fs.createWriteStream(temp_filepath)
