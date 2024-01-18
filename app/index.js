@@ -186,13 +186,11 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   create_pgpass()
 
-  const insert_db_create_statements = async function (pgdump_filepath, db_names) {
-    // wrap stream read writes in a promise so we can wait on stream to complete
+  const insert_db_create_statements = async function (pgdump_filepath, db_create_statements) {
+    // wrap stream read writes in a promise so we can wait on stream to complete in calling scope
     const p = new Promise((resolve, reject) => {
       try {
         console.log('Inserting Create db statements with original pgdump content')
-
-        const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
 
         const tmp_filepath = `${pgdump_filepath}.tmp`
         // write create dbs text to output file
@@ -200,11 +198,11 @@ inject('pod', async ({ boss, minio, discord }) => {
 
         // get a write stream on the output file
         const output_stream = fs.createWriteStream(tmp_filepath)
-        output_stream.write(create_dbs_text)
+        output_stream.write(db_create_statements)
 
         // callback: the promise wrapper is all for this
         // wait till output streeam closed so we can resolve and free up func execution in outer scope
-        output_stream_stream.on('error', err => reject(err))
+        output_stream.on('error', err => reject(err))
         output_stream.on('close', () => {
           console.log('output stream closed')
           resolve(tmp_filepath) // reolve this promise
@@ -223,6 +221,38 @@ inject('pod', async ({ boss, minio, discord }) => {
     })
     return p
   }
+
+  const get_db_create_statements = async function () {
+    // ---------------------------------------------------------------
+    // Fetch the database names from the server hosting the current db
+    // We will insert the create database statements at the head of the
+    // backup sql file
+    // ---------------------------------------------------------------
+    console.log('Fetching database names')
+    const db_container_name = c
+    const databases_output_file = `${dir}/${db_container_name}_databases.txt`
+    const databases_cmd_text = 'SELECT datname FROM pg_database WHERE datistemplate = false;'
+    const get_databases_cmd = `PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} --username ${DB_USER} -d ${DB_DATABASE} -o ${databases_output_file} -c "${databases_cmd_text}"`
+    await launch(`${c}`, get_databases_cmd, {
+      cwd: dir,
+      env: {
+        PATH: process.env.PATH
+      }
+    })
+
+    // ---------------------------------------------------------------
+    // Read back the db names from output file, build CREATE db statement
+    // lines, insert the statement lines at the head of the master
+    // backup/restore script
+    // ---------------------------------------------------------------
+
+    console.log('Building create database statements')
+    const db_names_content = fs.readFileSync(databases_output_file).toString().trim()
+    const db_names = db_names_content.split('\n').slice(2, -1) // ignore first 2 lines of output (col name and sperator lines) and also last line ( row count)
+    const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
+    return create_dbs_text
+  }
+
   const postgres_backup = async name => {
     try {
       console.log(`queueing backup '${name}'`)
@@ -236,8 +266,11 @@ inject('pod', async ({ boss, minio, discord }) => {
 
           const cmd = `pg_dumpall -h ${DB_HOST} -p ${DB_PORT} ${verbose} ${structure_only} -U ${DB_USER} --file=${c}.sql ${exclusions}`
           const dir = `${process.env.BK_DIR || `${process.cwd()}/data`}`
+          const pgdump_filepath = `${dir}/${c}.sql`
           console.log('cmd', cmd)
           console.log('directory', dir)
+          console.log('pg dump filepath', pgdump_filepath)
+
           await assert_dir(dir)
           try {
             // Create the backup sql file
@@ -247,36 +280,11 @@ inject('pod', async ({ boss, minio, discord }) => {
                 PATH: process.env.PATH
               }
             })
-            // ---------------------------------------------------------------
-            // Fetch the database names from the server hosting the current db
-            // We will insert the create database statements at the head of the
-            // backup sql file
-            // ---------------------------------------------------------------
-            console.log('Fetching database names')
-            const db_container_name = c
-            const databases_output_file = `${dir}/${db_container_name}_databases.txt`
-            const databases_cmd_text = 'SELECT datname FROM pg_database WHERE datistemplate = false;'
-            const get_databases_cmd = `PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} --username ${DB_USER} -d ${DB_DATABASE} -o ${databases_output_file} -c "${databases_cmd_text}"`
-            await launch(`${c}`, get_databases_cmd, {
-              cwd: dir,
-              env: {
-                PATH: process.env.PATH
-              }
-            })
 
-            // ---------------------------------------------------------------
-            // Read back the db names from output file, build CREATE db statement
-            // lines, insert the statement lines at the head of the master
-            // backup/restore script
-            // ---------------------------------------------------------------
-
-            console.log('Building create database statements')
-            const db_names_content = fs.readFileSync(databases_output_file).toString().trim()
-            const db_names = db_names_content.split('\n').slice(2, -1) // ignore first 2 lines of output (col name and sperator lines) and also last line ( row count)
+            const db_create_statements = get_db_create_statements()
 
             // 'Inserting Create db statements with original pgdump content'
-            const pgdump_filepath = `${dir}/${c}.sql`
-            const tmpfile = await insert_db_create_statements(pgdump_filepath, db_names)
+            const tmpfile = await insert_db_create_statements(pgdump_filepath, db_create_statements)
             console.log(tmpfile)
 
             execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.orig`)
