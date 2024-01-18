@@ -250,7 +250,7 @@ inject('pod', async ({ boss, minio, discord }) => {
                 // rename orig pgdump to the side
                 execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.orig`)
                 // write create dbs text to output file - only has create statements at this point
-                fs.writeFileSync(pgdump_filepath, create_dbs_text + '\n', 'w+')
+                fs.writeFileSync(pgdump_filepath, create_dbs_text + '\n')
                 // get a write stream on the output file
                 const output_stream = fs.createWriteStream(pgdump_filepath)
                 // a read stream on the orig backup sql
