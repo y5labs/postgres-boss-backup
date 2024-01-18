@@ -240,35 +240,37 @@ inject('pod', async ({ boss, minio, discord }) => {
 
             const pgdump_filepath = `${dir}/${c}.sql`
 
-            console.log(
-              `Inserting create statements at the head of the temp backup file: ${pgdump_filepath} \n${create_dbs_text}`
-            )
-
+            // 'Inserting Create db statements with original pgdump content'
             const merge_create_statements = async function () {
               // wrap stream read writes in a promise so we can wait on stream to complete
               const p = new Promise((resolve, reject) => {
-                // rename orig pgdump to the side
-                execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.orig`)
-                // write create dbs text to output file - only has create statements at this point
-                fs.writeFileSync(pgdump_filepath, create_dbs_text + '\n')
+                console.log('Inserting Create db statements with original pgdump content')
+                const tmp_filepath = `${pgdump_filepath}.tmp`
+                // write create dbs text to output file
+                fs.writeFileSync(tmp_filepath, create_dbs_text + '\n')
                 // get a write stream on the output file
-                const output_stream = fs.createWriteStream(pgdump_filepath)
+                const output_stream = fs.createWriteStream(tmp_filepath)
                 // a read stream on the orig backup sql
-                const pgdump_stream = fs.createReadStream(`${pgdump_filepath}.orig`) // read from original pg dump
+                const pgdump_stream = fs.createReadStream(pgdump_filepath) // read from original pg dump
 
-                // wait till output streeam closed so we can resolve and free up this func execution
+                // callback: the promise wrapper is all for this
+                // wait till output streeam closed so we can resolve and free up func execution in outer scope
                 output_stream.on('close', () => {
                   console.log('output stream closed')
-                  resolve('Content merged') // reolve this promise
+                  resolve(tmp_filepath) // reolve this promise
                 })
+
                 // append pgdump to the create dbs
                 pgdump_stream.pipe(output_stream)
               })
               return p
             }
 
-            const res = await merge_create_statements()
-            console.log(res)
+            const tmpfile = await merge_create_statements()
+            console.log(tmpfile)
+
+            execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.orig`)
+            execSync(`mv ${tmpfile} ${pgdump_filepath}`)
           } catch (e) {
             error(cmd, e)
             throw e
