@@ -251,10 +251,13 @@ inject('pod', async ({ boss, minio, discord }) => {
             // append pgdump to the create dbs
             pgdump_stream.pipe(output_stream)
             pgdump_stream.on('close', () => {
-              console.log('Done')
+              console.log('Piped')
             })
-            execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.copy`)
-            execSync(`mv ${temp_filepath} ${pgdump_filepath}`)
+            output_stream.on('close', () => {
+              console.log('output stream closed')
+              execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.copy`)
+              execSync(`mv ${temp_filepath} ${pgdump_filepath}`)
+            })
 
             // var data = fs.readFileSync(backup_file) //read existing contents into data
             // var fd = fs.openSync(backup_file, 'w+')
