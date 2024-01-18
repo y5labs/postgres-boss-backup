@@ -244,30 +244,31 @@ inject('pod', async ({ boss, minio, discord }) => {
               `Inserting create statements at the head of the temp backup file: ${pgdump_filepath} \n${create_dbs_text}`
             )
 
-            execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.orig`)
-            fs.writeFileSync(pgdump_filepath, create_dbs_text + '\n')
+            const merge_create_statements = async function () {
+              // wrap stream read writes in a promise so we can wait on stream to complete
+              const p = new Promise((resolve, reject) => {
+                // rename orig pgdump to the side
+                execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.orig`)
+                // write create dbs text to output file - only has create statements at this point
+                fs.writeFileSync(pgdump_filepath, create_dbs_text + '\n', 'w+')
+                // get a write stream on the output file
+                const output_stream = fs.createWriteStream(pgdump_filepath)
+                // a read stream on the orig backup sql
+                const pgdump_stream = fs.createReadStream(`${pgdump_filepath}.orig`) // read from original pg dump
 
-            const append_content = new Promise((resolve, reject) => {
-              const output_stream = fs.createWriteStream(pgdump_filepath)
-              const pgdump_stream = fs.createReadStream(`${pgdump_filepath}.orig`) // with existing content
-
-              // append pgdump to the create dbs
-              pgdump_stream.pipe(output_stream)
-              output_stream.on('close', () => {
-                console.log('output stream closed')
-                resolve() // reolve this promise
+                // wait till output streeam closed so we can resolve and free up this func execution
+                output_stream.on('close', () => {
+                  console.log('output stream closed')
+                  resolve('Content merged') // reolve this promise
+                })
+                // append pgdump to the create dbs
+                pgdump_stream.pipe(output_stream)
               })
-            })
+              return p
+            }
 
-            await append_content()
-
-            // var data = fs.readFileSync(backup_file) //read existing contents into data
-            // var fd = fs.openSync(backup_file, 'w+')
-            // var buffer = Buffer.from(create_dbs_text)
-
-            // fs.writeSync(fd, buffer, 0, buffer.length, 0) //write new data
-            // fs.writeSync(fd, data, 0, data.length, buffer.length) //append old data
-            // fs.close(fd)
+            const res = await merge_create_statements()
+            console.log(res)
           } catch (e) {
             error(cmd, e)
             throw e
