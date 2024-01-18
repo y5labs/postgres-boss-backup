@@ -239,25 +239,27 @@ inject('pod', async ({ boss, minio, discord }) => {
             const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
 
             const pgdump_filepath = `${dir}/${c}.sql`
-            const temp_filepath = `${dir}/${c}_tmp.sql`
 
             console.log(
-              `Inserting create statements at the head of the temp backup file: ${temp_filepath} \n${create_dbs_text}`
+              `Inserting create statements at the head of the temp backup file: ${pgdump_filepath} \n${create_dbs_text}`
             )
 
-            const output_stream = fs.createWriteStream(temp_filepath)
-            output_stream.write(create_dbs_text + '\n')
-            const pgdump_stream = fs.createReadStream(pgdump_filepath) // with existing content
-            // append pgdump to the create dbs
-            pgdump_stream.pipe(output_stream)
-            pgdump_stream.on('close', () => {
-              console.log('Piped')
+            execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.orig`)
+            fs.writeFileSync(pgdump_filepath, create_dbs_text + '\n')
+
+            const append_content = new Promise((resolve, reject) => {
+              const output_stream = fs.createWriteStream(pgdump_filepath)
+              const pgdump_stream = fs.createReadStream(`${pgdump_filepath}.orig`) // with existing content
+
+              // append pgdump to the create dbs
+              pgdump_stream.pipe(output_stream)
+              output_stream.on('close', () => {
+                console.log('output stream closed')
+                resolve() // reolve this promise
+              })
             })
-            output_stream.on('close', () => {
-              console.log('output stream closed')
-              execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.copy`)
-              execSync(`mv ${temp_filepath} ${pgdump_filepath}`)
-            })
+
+            await append_content()
 
             // var data = fs.readFileSync(backup_file) //read existing contents into data
             // var fd = fs.openSync(backup_file, 'w+')
