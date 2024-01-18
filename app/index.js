@@ -194,7 +194,7 @@ inject('pod', async ({ boss, minio, discord }) => {
 
         const tmp_filepath = `${pgdump_filepath}.tmp`
         // write create dbs text to output file
-        console.log(create_dbs_text)
+        console.log(db_create_statements)
 
         // get a write stream on the output file
         const output_stream = fs.createWriteStream(tmp_filepath)
