@@ -186,6 +186,43 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   create_pgpass()
 
+  const insert_db_create_statements = async function (pgdump_filepath, db_names) {
+    // wrap stream read writes in a promise so we can wait on stream to complete
+    const p = new Promise((resolve, reject) => {
+      try {
+        console.log('Inserting Create db statements with original pgdump content')
+
+        const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
+
+        const tmp_filepath = `${pgdump_filepath}.tmp`
+        // write create dbs text to output file
+        console.log(create_dbs_text)
+
+        // get a write stream on the output file
+        const output_stream = fs.createWriteStream(tmp_filepath)
+        output_stream.write(create_dbs_text)
+
+        // callback: the promise wrapper is all for this
+        // wait till output streeam closed so we can resolve and free up func execution in outer scope
+        output_stream_stream.on('error', err => reject(err))
+        output_stream.on('close', () => {
+          console.log('output stream closed')
+          resolve(tmp_filepath) // reolve this promise
+        })
+
+        // a read stream on the orig backup sql
+        const pgdump_stream = fs.createReadStream(pgdump_filepath) // read from original pg dump
+        pgdump_stream.on('error', err => reject(err))
+        // append pgdump to the create dbs
+
+        throw Error('Testing merge create error handling')
+        pgdump_stream.pipe(output_stream)
+      } catch (err) {
+        reject(err)
+      }
+    })
+    return p
+  }
   const postgres_backup = async name => {
     try {
       console.log(`queueing backup '${name}'`)
@@ -236,40 +273,10 @@ inject('pod', async ({ boss, minio, discord }) => {
             console.log('Building create database statements')
             const db_names_content = fs.readFileSync(databases_output_file).toString().trim()
             const db_names = db_names_content.split('\n').slice(2, -1) // ignore first 2 lines of output (col name and sperator lines) and also last line ( row count)
-            const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
-
-            const pgdump_filepath = `${dir}/${c}.sql`
 
             // 'Inserting Create db statements with original pgdump content'
-            const merge_create_statements = async function () {
-              // wrap stream read writes in a promise so we can wait on stream to complete
-              const p = new Promise((resolve, reject) => {
-                console.log('Inserting Create db statements with original pgdump content')
-                const tmp_filepath = `${pgdump_filepath}.tmp`
-                // write create dbs text to output file
-
-                console.log(create_dbs_text)
-
-                // get a write stream on the output file
-                const output_stream = fs.createWriteStream(tmp_filepath)
-                output_stream.write(create_dbs_text)
-
-                // callback: the promise wrapper is all for this
-                // wait till output streeam closed so we can resolve and free up func execution in outer scope
-                output_stream.on('close', () => {
-                  console.log('output stream closed')
-                  resolve(tmp_filepath) // reolve this promise
-                })
-
-                // a read stream on the orig backup sql
-                const pgdump_stream = fs.createReadStream(pgdump_filepath) // read from original pg dump
-                // append pgdump to the create dbs
-                pgdump_stream.pipe(output_stream)
-              })
-              return p
-            }
-
-            const tmpfile = await merge_create_statements()
+            const pgdump_filepath = `${dir}/${c}.sql`
+            const tmpfile = await insert_db_create_statements(pgdump_filepath, db_names)
             console.log(tmpfile)
 
             execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.orig`)
