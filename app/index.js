@@ -1,6 +1,6 @@
 import inject from 'seacreature/lib/inject'
 import pLimit from 'p-limit'
-import { exec } from 'child_process'
+import { exec, execSync } from 'child_process'
 import pg from 'pg'
 import fsp from 'fs/promises'
 import fs from 'fs'
@@ -238,17 +238,31 @@ inject('pod', async ({ boss, minio, discord }) => {
             const db_names = db_names_content.split('\n').slice(2, -1) // ignore first 2 lines of output (col name and sperator lines) and also last line ( row count)
             const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
 
-            const backup_file = `${dir}/${c}.sql`
+            const pgdump_filepath = `${dir}/${c}.sql`
+            const temp_filepath = `${dir}/${c}_tmp.sql`
+
             console.log(
               `Inserting create statements at the head of the backup file: ${backup_file} \n${create_dbs_text}`
             )
-            var data = fs.readFileSync(backup_file) //read existing contents into data
-            var fd = fs.openSync(backup_file, 'w+')
-            var buffer = Buffer.from(create_dbs_text)
 
-            fs.writeSync(fd, buffer, 0, buffer.length, 0) //write new data
-            fs.writeSync(fd, data, 0, data.length, buffer.length) //append old data
-            fs.close(fd)
+            const output_stream = fs.createWriteStream(temp_filepath)
+            output_stream.write(create_dbs_text + '\n')
+            const pgdump_stream = fs.createReadStream(pgdump_filepath) // with existing content
+            // append pgdump to the create dbs
+            pgdump_stream.pipe(output_stream)
+            pgdump_stream.on('close', () => {
+              console.log('Done')
+            })
+            execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.copy`)
+            execSync(`mv ${temp_filepath} ${pgdump_filepath}`)
+
+            // var data = fs.readFileSync(backup_file) //read existing contents into data
+            // var fd = fs.openSync(backup_file, 'w+')
+            // var buffer = Buffer.from(create_dbs_text)
+
+            // fs.writeSync(fd, buffer, 0, buffer.length, 0) //write new data
+            // fs.writeSync(fd, data, 0, data.length, buffer.length) //append old data
+            // fs.close(fd)
           } catch (e) {
             error(cmd, e)
             throw e
