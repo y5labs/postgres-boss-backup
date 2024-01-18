@@ -222,18 +222,18 @@ inject('pod', async ({ boss, minio, discord }) => {
     return p
   }
 
-  const get_db_create_statements = async function (db_container_name) {
+  const get_db_create_statements = async function (db_container_name, working_dir) {
     // ---------------------------------------------------------------
     // Fetch the database names from the server hosting the current db
     // We will insert the create database statements at the head of the
     // backup sql file
     // ---------------------------------------------------------------
     console.log('Fetching database names')
-    const databases_output_file = `${dir}/${db_container_name}_databases.txt`
+    const databases_output_file = `${working_dir}/${db_container_name}_databases.txt`
     const databases_cmd_text = 'SELECT datname FROM pg_database WHERE datistemplate = false;'
     const get_databases_cmd = `PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} --username ${DB_USER} -d ${DB_DATABASE} -o ${databases_output_file} -c "${databases_cmd_text}"`
-    await launch(`${c}`, get_databases_cmd, {
-      cwd: dir,
+    await launch(`${db_container_name}`, get_databases_cmd, {
+      cwd: working_dir,
       env: {
         PATH: process.env.PATH
       }
@@ -280,7 +280,7 @@ inject('pod', async ({ boss, minio, discord }) => {
               }
             })
 
-            const db_create_statements = get_db_create_statements(c)
+            const db_create_statements = get_db_create_statements(c, dir)
 
             // 'Inserting Create db statements with original pgdump content'
             const tmpfile = await insert_db_create_statements(pgdump_filepath, db_create_statements)
