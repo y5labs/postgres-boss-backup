@@ -247,11 +247,12 @@ inject('pod', async ({ boss, minio, discord }) => {
                 console.log('Inserting Create db statements with original pgdump content')
                 const tmp_filepath = `${pgdump_filepath}.tmp`
                 // write create dbs text to output file
-                fs.writeFileSync(tmp_filepath, create_dbs_text + '\n')
+
+                console.log(create_dbs_text)
+
                 // get a write stream on the output file
                 const output_stream = fs.createWriteStream(tmp_filepath)
-                // a read stream on the orig backup sql
-                const pgdump_stream = fs.createReadStream(pgdump_filepath) // read from original pg dump
+                output_stream.write(create_dbs_text)
 
                 // callback: the promise wrapper is all for this
                 // wait till output streeam closed so we can resolve and free up func execution in outer scope
@@ -260,6 +261,8 @@ inject('pod', async ({ boss, minio, discord }) => {
                   resolve(tmp_filepath) // reolve this promise
                 })
 
+                // a read stream on the orig backup sql
+                const pgdump_stream = fs.createReadStream(pgdump_filepath) // read from original pg dump
                 // append pgdump to the create dbs
                 pgdump_stream.pipe(output_stream)
               })
