@@ -462,7 +462,7 @@ inject('pod', async ({ boss, minio, discord }) => {
               title: 'An error has occured while trying to back up the database.',
               color: 16711680,
               timestamp: new Date(),
-              fields: [e]
+              fields: []
             }
           ]
         )
