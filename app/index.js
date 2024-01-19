@@ -454,6 +454,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     } catch (e) {
       console.error(`unable to perform postgres backup for '${SERVER_NAME.toLowerCase()}'`)
       if (job_entry.retrycount < 3) {
+        console.log(`Job retry count is currently ${job_entry.retrycount} limit is ${job_entry.retryLimit}`)
         await discord.notification(
           `:warning: Postgres Backup → Unable to perform a database backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}', retrying...`,
           [
