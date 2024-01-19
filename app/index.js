@@ -194,7 +194,6 @@ inject('pod', async ({ boss, minio, discord }) => {
 
         const tmp_filepath = `${pgdump_filepath}.tmp`
         // write create dbs text to output file
-        console.log(db_create_statements)
 
         // get a write stream on the output file
         const output_stream = fs.createWriteStream(tmp_filepath)
@@ -249,6 +248,7 @@ inject('pod', async ({ boss, minio, discord }) => {
     const db_names_content = fs.readFileSync(databases_output_file).toString().trim()
     const db_names = db_names_content.split('\n').slice(2, -1) // ignore first 2 lines of output (col name and sperator lines) and also last line ( row count)
     const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
+    console.log(create_dbs_text)
     return create_dbs_text
   }
 
@@ -280,7 +280,8 @@ inject('pod', async ({ boss, minio, discord }) => {
               }
             })
 
-            const db_create_statements = get_db_create_statements(c, dir)
+            const db_create_statements = await get_db_create_statements(c, dir)
+            console.log('The db create statements')
 
             // 'Inserting Create db statements with original pgdump content'
             const tmpfile = await insert_db_create_statements(pgdump_filepath, db_create_statements)
