@@ -212,7 +212,7 @@ inject('pod', async ({ boss, minio, discord }) => {
         pgdump_stream.on('error', err => reject(err))
         // append pgdump to the create dbs
 
-        throw Error('Testing merge create error handling')
+        // throw Error('Testing merge create error handling')
 
         pgdump_stream.pipe(output_stream)
       } catch (err) {
