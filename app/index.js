@@ -210,10 +210,8 @@ inject('pod', async ({ boss, minio, discord }) => {
         // a read stream on the orig backup sql
         const pgdump_stream = fs.createReadStream(pgdump_filepath) // read from original pg dump
         pgdump_stream.on('error', err => reject(err))
-        // append pgdump to the create dbs
-
         // throw Error('Testing merge create error handling')
-
+        // append pgdump to the create dbs
         pgdump_stream.pipe(output_stream)
       } catch (err) {
         reject(err)
@@ -371,7 +369,8 @@ inject('pod', async ({ boss, minio, discord }) => {
       // console.log(`postgres backup '${backup_path}' deleted`)
     } catch (err) {
       console.log(`something went wrong writing a backup to s3 bucket '${S3_BUCKET.toLowerCase()}'`)
-      console.log(err.message)
+      console.log(err.message, err)
+      throw err
     }
   }
 
