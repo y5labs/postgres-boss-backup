@@ -213,6 +213,7 @@ inject('pod', async ({ boss, minio, discord }) => {
         // append pgdump to the create dbs
 
         throw Error('Testing merge create error handling')
+
         pgdump_stream.pipe(output_stream)
       } catch (err) {
         reject(err)
@@ -281,14 +282,13 @@ inject('pod', async ({ boss, minio, discord }) => {
             })
 
             const db_create_statements = await get_db_create_statements(c, dir)
-            console.log('The db create statements')
-
             // 'Inserting Create db statements with original pgdump content'
             const tmpfile = await insert_db_create_statements(pgdump_filepath, db_create_statements)
             console.log(tmpfile)
-
+            console.log('moving the orig dump file and replacing with updated file')
             execSync(`mv ${pgdump_filepath} ${pgdump_filepath}.orig`)
             execSync(`mv ${tmpfile} ${pgdump_filepath}`)
+            execSync(`ls -la ${dir}`)
           } catch (e) {
             error(cmd, e)
             throw e
