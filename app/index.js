@@ -161,7 +161,7 @@ const check_pgpass = function () {
 }
 
 // check for s3 bucket existence
-const minio_bucket_check = async () => {
+const s3_bucket_check = async s3client => {
   const bucket_name = S3_BUCKET.toLowerCase()
   try {
     const buckets = await minio.listBuckets()
@@ -248,7 +248,7 @@ const get_db_create_statements = async function (db_container_name, working_dir)
 inject('pod', async ({ boss, minio, discord }) => {
   const job_prefix = 'postgres-backup'
 
-  const s3_bucket_ok = await minio_bucket_check()
+  const s3_bucket_ok = await s3_bucket_check(minio)
 
   create_pgpass()
 
@@ -541,10 +541,10 @@ inject('pod', async ({ boss, minio, discord }) => {
     remove_pgpass()
   })
   inject('command.create_bucket', async () => {
-    await minio_bucket_check()
+    await s3_bucket_check(minio)
   })
   inject('command.s3_upload', async () => {
-    await minio_bucket_check()
+    await s3_bucket_check(minio)
     await backblaze_write(CONTAINER_NAME)
   })
 })
