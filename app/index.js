@@ -9,6 +9,34 @@ import zlib from 'zlib'
 // import { create } from 'domain'
 // import { fileURLToPath } from 'url'
 
+const {
+  BACKUP_DIRECTORY,
+  BOSS_APPLICATION_NAME,
+  BOSS_SCHEDULE,
+  BOSS_RETRY_DELAY,
+  BOSS_RETRY_LIMIT,
+  BOSS_RETRY_BACKOFF,
+  BOSS_EXPIRE_MINUTES,
+  BOSS_TZ,
+  CONTAINER_NAME,
+  DATABASE_BLACKLIST,
+  DATABASE_STRUCTURE_ONLY,
+  DB_HOST,
+  DB_PORT,
+  DB_USER,
+  DB_DATABASE,
+  DB_PASSWORD,
+  DISCORD_ICON,
+  DUMP_LOGGING,
+  SERVER_NAME,
+  S3_URL,
+  S3_BUCKET,
+  S3_REGION,
+  S3_ACCESS_KEY,
+  S3_SECRET_KEY,
+  SAVE_UNCOMPRESSED_BACKUP
+} = process.env
+
 const assert_dir = async dir => {
   try {
     await fsp.access(dir)
@@ -218,34 +246,6 @@ const get_db_create_statements = async function (db_container_name, working_dir)
 }
 
 inject('pod', async ({ boss, minio, discord }) => {
-  const {
-    BACKUP_DIRECTORY,
-    BOSS_APPLICATION_NAME,
-    BOSS_SCHEDULE,
-    BOSS_RETRY_DELAY,
-    BOSS_RETRY_LIMIT,
-    BOSS_RETRY_BACKOFF,
-    BOSS_EXPIRE_MINUTES,
-    BOSS_TZ,
-    CONTAINER_NAME,
-    DATABASE_BLACKLIST,
-    DATABASE_STRUCTURE_ONLY,
-    DB_HOST,
-    DB_PORT,
-    DB_USER,
-    DB_DATABASE,
-    DB_PASSWORD,
-    DISCORD_ICON,
-    DUMP_LOGGING,
-    SERVER_NAME,
-    S3_URL,
-    S3_BUCKET,
-    S3_REGION,
-    S3_ACCESS_KEY,
-    S3_SECRET_KEY,
-    SAVE_UNCOMPRESSED_BACKUP
-  } = process.env
-
   const job_prefix = 'postgres-backup'
 
   const s3_bucket_ok = await minio_bucket_check()
