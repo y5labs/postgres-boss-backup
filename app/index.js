@@ -411,10 +411,14 @@ inject('pod', async ({ boss, minio, discord }) => {
   }
 
   const remove_uncompressed_backups = function (container_name) {
-    const removals = [`./data/${container_name}.sql.gz`, `./data/${container_name}.sql.tmp`]
+    const removals = [`./data/${container_name}.sql`, `./data/${container_name}.sql.orig`]
     for (const path of removals) {
-      console.log(`removing uncompressed backup file ${path}`)
-      execSync(`rm ${path}`)
+      try {
+        console.log(`removing uncompressed backup file ${path}`)
+        execSync(`rm ${path}`)
+      } catch (err) {
+        console.log(err)
+      }
     }
   }
 
