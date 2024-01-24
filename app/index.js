@@ -161,7 +161,7 @@ const check_pgpass = function () {
 }
 
 // check for s3 bucket existence
-const s3_bucket_check = async s3client => {
+const s3_bucket_check = async minio => {
   const bucket_name = S3_BUCKET.toLowerCase()
   try {
     const buckets = await minio.listBuckets()
