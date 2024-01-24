@@ -482,6 +482,18 @@ inject('pod', async ({ boss, minio, discord }) => {
         size_output += `${formatted_key}: ${value} MB\n`
       }
 
+      const notification_fields = [
+        {
+          name: 'Timing',
+          value: timing_output
+        },
+        {
+          name: 'Size',
+          value: size_output
+        }
+      ]
+      console.log(`Done. Backup and upload to s3 bucket complete: \n${notification_fields} \n${S3_BUCKET}`)
+
       await discord.notification(
         `✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}' completed successfully.`,
         [
@@ -489,16 +501,7 @@ inject('pod', async ({ boss, minio, discord }) => {
             title: `Backup completed successfully in ${timing.total} secs`,
             color: 65280,
             timestamp: new Date(),
-            fields: [
-              {
-                name: 'Timing',
-                value: timing_output
-              },
-              {
-                name: 'Size',
-                value: size_output
-              }
-            ]
+            fields: notification_fields
           }
         ]
       )
