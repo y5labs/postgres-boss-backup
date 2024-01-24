@@ -132,6 +132,91 @@ const check_pgpass = function () {
   console.log(`pgpass file exists at ${pgpass_filepath} - ${fs.readFileSync(pgpass_filepath).toString()}`)
 }
 
+// check for s3 bucket existence
+const minio_bucket_check = async () => {
+  const bucket_name = S3_BUCKET.toLowerCase()
+  try {
+    const buckets = await minio.listBuckets()
+    console.log(buckets)
+    const exists = buckets.find(b => b.name === bucket_name)
+    if (!exists) {
+      await minio.makeBucket(bucket_name, S3_REGION)
+      console.log(`s3 bucket '${bucket_name}' created`)
+    } else {
+      console.log(`s3 bucket '${bucket_name}' already exists`)
+    }
+  } catch (err) {
+    console.log(`something went wrong verifying/creating a s3 bucket for '${bucket_name}'`)
+    console.log(err.message)
+    return false
+  }
+  return true
+}
+
+const insert_db_create_statements = async function (pgdump_filepath, db_create_statements) {
+  // wrap stream read/writes in a promise so we can wait on streams to complete in calling scope
+  const p = new Promise((resolve, reject) => {
+    try {
+      console.log('Inserting Create db statements with original pgdump content')
+
+      const tmp_filepath = `${pgdump_filepath}.tmp`
+      // write create dbs text to output file
+
+      // get a write stream on the output file
+      const output_stream = fs.createWriteStream(tmp_filepath)
+      output_stream.write(db_create_statements)
+
+      // callback: the promise wrapper is all for this
+      // wait till output streeam closed so we can resolve and free up func execution in outer scope
+      output_stream.on('error', err => reject(err))
+      output_stream.on('close', () => {
+        console.log('output stream closed')
+        resolve(tmp_filepath) // reolve this promise
+      })
+
+      // a read stream on the orig backup sql
+      const pgdump_stream = fs.createReadStream(pgdump_filepath) // read from original pg dump
+      pgdump_stream.on('error', err => reject(err))
+      // throw Error('Testing merge create error handling')
+      // append pgdump to the create dbs
+      pgdump_stream.pipe(output_stream)
+    } catch (err) {
+      reject(err)
+    }
+  })
+  return p
+}
+
+const get_db_create_statements = async function (db_container_name, working_dir) {
+  // ---------------------------------------------------------------
+  // Fetch the database names from the server hosting the current db
+  // We will insert the create database statements at the head of the
+  // backup sql file
+  // ---------------------------------------------------------------
+  console.log('Fetching database names')
+  const databases_output_file = `${working_dir}/${db_container_name}_databases.txt`
+  const databases_cmd_text = 'SELECT datname FROM pg_database WHERE datistemplate = false;'
+  const get_databases_cmd = `PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} --username ${DB_USER} -d ${DB_DATABASE} -o ${databases_output_file} -c "${databases_cmd_text}"`
+  await launch(`${db_container_name}`, get_databases_cmd, {
+    cwd: working_dir,
+    env: {
+      PATH: process.env.PATH
+    }
+  })
+
+  // ---------------------------------------------------------------
+  // Read back the db names from output file, build CREATE db statement
+  // lines and return
+  // ---------------------------------------------------------------
+
+  console.log('Building create database statements')
+  const db_names_content = fs.readFileSync(databases_output_file).toString().trim()
+  const db_names = db_names_content.split('\n').slice(2, -1) // ignore first 2 lines of output (col name and sperator lines) and also last line ( row count)
+  const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
+  console.log(create_dbs_text)
+  return create_dbs_text
+}
+
 inject('pod', async ({ boss, minio, discord }) => {
   const {
     BACKUP_DIRECTORY,
@@ -156,100 +241,16 @@ inject('pod', async ({ boss, minio, discord }) => {
     S3_URL,
     S3_BUCKET,
     S3_REGION,
+    S3_ACCESS_KEY,
+    S3_SECRET_KEY,
     SAVE_UNCOMPRESSED_BACKUP
   } = process.env
 
   const job_prefix = 'postgres-backup'
 
-  // check for s3 bucket existence
-  const minio_bucket_check = async () => {
-    const bucket_name = S3_BUCKET.toLowerCase()
-    try {
-      const buckets = await minio.listBuckets()
-      console.log(buckets)
-      const exists = buckets.find(b => b.name === bucket_name)
-      if (!exists) {
-        await minio.makeBucket(bucket_name, S3_REGION)
-        console.log(`s3 bucket '${bucket_name}' created`)
-      } else {
-        console.log(`s3 bucket '${bucket_name}' already exists`)
-      }
-    } catch (err) {
-      console.log(`something went wrong verifying/creating a s3 bucket for '${bucket_name}'`)
-      console.log(err.message)
-      return false
-    }
-    return true
-  }
-
   const s3_bucket_ok = await minio_bucket_check()
 
   create_pgpass()
-
-  const insert_db_create_statements = async function (pgdump_filepath, db_create_statements) {
-    // wrap stream read writes in a promise so we can wait on stream to complete in calling scope
-    const p = new Promise((resolve, reject) => {
-      try {
-        console.log('Inserting Create db statements with original pgdump content')
-
-        const tmp_filepath = `${pgdump_filepath}.tmp`
-        // write create dbs text to output file
-
-        // get a write stream on the output file
-        const output_stream = fs.createWriteStream(tmp_filepath)
-        output_stream.write(db_create_statements)
-
-        // callback: the promise wrapper is all for this
-        // wait till output streeam closed so we can resolve and free up func execution in outer scope
-        output_stream.on('error', err => reject(err))
-        output_stream.on('close', () => {
-          console.log('output stream closed')
-          resolve(tmp_filepath) // reolve this promise
-        })
-
-        // a read stream on the orig backup sql
-        const pgdump_stream = fs.createReadStream(pgdump_filepath) // read from original pg dump
-        pgdump_stream.on('error', err => reject(err))
-        // throw Error('Testing merge create error handling')
-        // append pgdump to the create dbs
-        pgdump_stream.pipe(output_stream)
-      } catch (err) {
-        reject(err)
-      }
-    })
-    return p
-  }
-
-  const get_db_create_statements = async function (db_container_name, working_dir) {
-    // ---------------------------------------------------------------
-    // Fetch the database names from the server hosting the current db
-    // We will insert the create database statements at the head of the
-    // backup sql file
-    // ---------------------------------------------------------------
-    console.log('Fetching database names')
-    const databases_output_file = `${working_dir}/${db_container_name}_databases.txt`
-    const databases_cmd_text = 'SELECT datname FROM pg_database WHERE datistemplate = false;'
-    const get_databases_cmd = `PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} --username ${DB_USER} -d ${DB_DATABASE} -o ${databases_output_file} -c "${databases_cmd_text}"`
-    await launch(`${db_container_name}`, get_databases_cmd, {
-      cwd: working_dir,
-      env: {
-        PATH: process.env.PATH
-      }
-    })
-
-    // ---------------------------------------------------------------
-    // Read back the db names from output file, build CREATE db statement
-    // lines, insert the statement lines at the head of the master
-    // backup/restore script
-    // ---------------------------------------------------------------
-
-    console.log('Building create database statements')
-    const db_names_content = fs.readFileSync(databases_output_file).toString().trim()
-    const db_names = db_names_content.split('\n').slice(2, -1) // ignore first 2 lines of output (col name and sperator lines) and also last line ( row count)
-    const create_dbs_text = db_names.map(n => `CREATE DATABASE ${n.trim()};`).join('\n') + '\n'
-    console.log(create_dbs_text)
-    return create_dbs_text
-  }
 
   const postgres_backup = async name => {
     try {
@@ -280,7 +281,7 @@ inject('pod', async ({ boss, minio, discord }) => {
             })
 
             const db_create_statements = await get_db_create_statements(c, dir)
-            // 'Inserting Create db statements with original pgdump content'
+            // 'Inserting Create db statements with original pgdump content into a new temp file - return the new tempfile path'
             const tmpfile = await insert_db_create_statements(pgdump_filepath, db_create_statements)
             console.log(tmpfile)
             console.log('moving the orig dump file and replacing with updated file')
@@ -323,6 +324,39 @@ inject('pod', async ({ boss, minio, discord }) => {
     }
   }
 
+  const backblaze_write = async function (container_name) {
+    console.log('Writing backup file to s3 bucket')
+    try {
+      const compressed_backup_name = `${container_name}.sql.gz`
+      const compressed_backup_filepath = `./data/${container_name}.sql.gz`
+      const date_directory = format(new Date(), 'yyyy-MM-dd')
+      const missing = [compressed_backup_filepath].filter(p => !fs.existsSync(p))
+      if (missing.length) {
+        console.error(`Unable to locate all backup files. Missing ${missing}.`)
+        throw new Error(`Unable to locate all backup files. Missing ${missing}.`)
+      }
+      // --------------------------------------------------
+      // Bucket object naming - note the object path prefix
+      // doesnt include the bucket name - thats later
+      // --------------------------------------------------
+      const is_backblaze_target = S3_URL.includes('backblaze')
+      if (!is_backblaze_target) {
+        throw new Error(`backblaze_write: the S3_URL does not look like a backblaze bucket: ${S3_URL}`)
+      }
+      const s3_object_path_prefix = is_backblaze_target
+        ? `database/${DB_DATABASE}/${date_directory}`
+        : `${date_directory}`
+      const compressed_s3_object_path = `${s3_object_path_prefix}/${compressed_backup_name}`
+      const upload_command = `b2 authorize-account ${S3_ACCESS_KEY} ${S3_SECRET_KEY} && b2 upload_file ${S3_BUCKET} ${compressed_backup_filepath} ${compressed_s3_object_path}`
+      const res = execSync(upload_command).toString().trim()
+      // todo: interrogate the result payload for success/fail
+      console.log(res)
+    } catch (err) {
+      throw err
+      console.log(err)
+    }
+  }
+
   const minio_write = async file_name => {
     try {
       console.log('write back ups to s3 bucket')
@@ -345,8 +379,10 @@ inject('pod', async ({ boss, minio, discord }) => {
       // Bucket object naming - note the object path prefix
       // doesnt include the bucket name - thats later
       // --------------------------------------------------
-      const backblaze_target = S3_URL.includes('backblaze')
-      const s3_object_path_prefix = backblaze_target ? `database/${DB_DATABASE}/${date_directory}` : `${date_directory}`
+      const is_backblaze_target = S3_URL.includes('backblaze')
+      const s3_object_path_prefix = is_backblaze_target
+        ? `database/${DB_DATABASE}/${date_directory}`
+        : `${date_directory}`
       const uncompressed_object_path = `${s3_object_path_prefix}/${uncompressed_backup_name}`
       const compressed_object_path = `${s3_object_path_prefix}/${compressed_backup_name}`
       const write_uncompressed_to_s3 = SAVE_UNCOMPRESSED_BACKUP.toLowerCase() == 'true'
@@ -374,6 +410,14 @@ inject('pod', async ({ boss, minio, discord }) => {
     }
   }
 
+  const remove_uncompressed_backups = function (container_name) {
+    const removals = [`./data/${container_name}.sql.gz`, `./data/${container_name}.sql.tmp`]
+    for (const path in removals) {
+      console.log(`removing uncompressed backup file ${path}`)
+      execSync(`rm ${path}`)
+    }
+  }
+
   const SCHEDULE = BOSS_SCHEDULE || '0 0 * * *'
   await boss.schedule(`${job_prefix}.${SERVER_NAME}.${CONTAINER_NAME}`, SCHEDULE, null, {
     singletonKey: `${BOSS_APPLICATION_NAME}.${SERVER_NAME.toLowerCase()}`,
@@ -386,6 +430,8 @@ inject('pod', async ({ boss, minio, discord }) => {
 
   await boss.work(`${job_prefix}.${SERVER_NAME}.${CONTAINER_NAME}`, async job => {
     const job_entry = await boss.getJobById(job.id)
+    console.log(JSON.stringify(job_entry))
+
     const formatted_name = await format_string(SERVER_NAME.toLowerCase())
 
     try {
@@ -397,11 +443,14 @@ inject('pod', async ({ boss, minio, discord }) => {
       await compress_backup(CONTAINER_NAME)
       const compression_end = Date.now()
       const minio_start = Date.now()
-      await minio_write(CONTAINER_NAME)
+      // await minio_write(CONTAINER_NAME)
+      await backblaze_write(CONTAINER_NAME)
       const minio_end = Date.now()
 
       const backup = fs.statSync(`./data/${CONTAINER_NAME}.sql`)
       const backup_compressed = fs.statSync(`./data/${CONTAINER_NAME}.sql.gz`)
+
+      remove_uncompressed_backups(CONTAINER_NAME)
 
       const size = {
         backup: (backup.size / 1024 / 1024).toFixed(0),
@@ -461,7 +510,14 @@ inject('pod', async ({ boss, minio, discord }) => {
               title: 'An error has occured while trying to back up the database.',
               color: 16711680,
               timestamp: new Date(),
-              fields: []
+              fields: [
+                {
+                  name: 'type',
+                  value: e.name
+                },
+                { name: 'message', value: e.message }
+                // { name: 'stack', value: e.stack }
+              ]
             }
           ]
         )
@@ -489,6 +545,6 @@ inject('pod', async ({ boss, minio, discord }) => {
   })
   inject('command.s3_upload', async () => {
     await minio_bucket_check()
-    await minio_write()
+    await backblaze_write(CONTAINER_NAME)
   })
 })
