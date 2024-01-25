@@ -466,7 +466,7 @@ inject('pod', async ({ boss, minio, discord }) => {
       const timing = {
         backup: ((backup_end - backup_start) / 1000).toFixed(0),
         compression: ((compression_end - compression_start) / 1000).toFixed(0),
-        minio: ((minio_end - minio_start) / 1000).toFixed(0),
+        s3: ((minio_end - minio_start) / 1000).toFixed(0),
         total: ((end - start) / 1000).toFixed(0)
       }
 
