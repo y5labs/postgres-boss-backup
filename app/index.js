@@ -26,6 +26,7 @@ const {
   DB_USER,
   DB_DATABASE,
   DB_PASSWORD,
+  DISCORD_NOTIFY_SUCCESS = 1,
   DISCORD_ICON,
   DUMP_LOGGING,
   SERVER_NAME,
@@ -496,17 +497,18 @@ inject('pod', async ({ boss, minio, discord }) => {
         `Done. Backup and upload to s3 bucket complete: \n${JSON.stringify(notification_fields)} \n${S3_BUCKET}`
       )
 
-      await discord.notification(
-        `✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}' completed successfully.`,
-        [
-          {
-            title: `Backup completed successfully in ${timing.total} secs`,
-            color: 65280,
-            timestamp: new Date(),
-            fields: notification_fields
-          }
-        ]
-      )
+      if (job_entry.retrycount > 0 || parseInt(DISCORD_NOTIFY_SUCCESS) === 1)
+        await discord.notification(
+          `✅ Postgres Backup → Databse backup for '${DISCORD_ICON} ${formatted_name} - ${CONTAINER_NAME}' completed successfully.`,
+          [
+            {
+              title: `Backup completed successfully in ${timing.total} secs`,
+              color: 65280,
+              timestamp: new Date(),
+              fields: notification_fields
+            }
+          ]
+        )
       await job.done()
     } catch (e) {
       console.error(`unable to perform postgres backup for '${SERVER_NAME.toLowerCase()}'`)
