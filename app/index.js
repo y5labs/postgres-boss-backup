@@ -5,7 +5,7 @@ import pg from 'pg'
 import fsp from 'fs/promises'
 import fs from 'fs'
 import { format } from 'date-fns'
-import zlib from 'zlib'
+import zlib from 'node:zlib'
 // import { create } from 'domain'
 // import { fileURLToPath } from 'url'
 
