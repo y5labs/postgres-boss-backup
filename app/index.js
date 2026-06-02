@@ -326,7 +326,7 @@ inject('pod', async ({ boss, minio, discord }) => {
   }
 
   const backblaze_write = async function (container_name) {
-    return console.log('Writing backup file to s3 bucket')
+    console.log('Writing backup file to s3 bucket')
     try {
       const compressed_backup_name = `${container_name}.sql.gz`
       const compressed_backup_filepath = `./data/${container_name}.sql.gz`
